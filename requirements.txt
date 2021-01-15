@@ -1,0 +1,48 @@
+astroid==2.3.3
+Brotli @ file:///C:/ci/brotli-split_1602517705222/work
+certifi==2020.12.5
+click==7.1.2
+colorama==0.4.3
+colour==0.1.5
+cycler==0.10.0
+dash @ file:///tmp/build/80754af9/dash_1607621005479/work
+dash-bootstrap-components==0.11.1
+dash-core-components==1.14.1
+dash-html-components==1.1.1
+dash-renderer==1.8.3
+dash-table==4.11.1
+decorator==4.4.2
+Flask==1.1.2
+Flask-Compress @ file:///tmp/build/80754af9/flask-compress_1605067594328/work
+future==0.18.2
+isort==4.3.21
+itsdangerous==1.1.0
+Jinja2==2.11.2
+kiwisolver @ file:///C:/ci/kiwisolver_1604014703538/work
+lazy-object-proxy==1.4.3
+MarkupSafe==1.1.1
+matplotlib==3.3.3
+mccabe==0.6.1
+mkl-fft==1.2.0
+mkl-random==1.1.1
+mkl-service==2.3.0
+networkx @ file:///tmp/build/80754af9/networkx_1598376031484/work
+numpy==1.19.5
+olefile==0.46
+pandas @ file:///C:/ci/pandas_1609008050392/work
+Pillow @ file:///C:/ci/pillow_1609786840597/work
+plotly @ file:///tmp/build/80754af9/plotly_1610565580232/work
+pylint==2.4.4
+pyparsing==2.4.7
+python-dateutil==2.8.1
+pytz @ file:///tmp/build/80754af9/pytz_1608922264688/work
+PyYAML==5.3.1
+retrying==1.3.3
+scipy @ file:///C:/ci/scipy_1604596260408/work
+seaborn @ file:///tmp/build/80754af9/seaborn_1608578541026/work
+sip==4.19.13
+six==1.14.0
+tornado @ file:///C:/ci/tornado_1606942392901/work
+Werkzeug==1.0.1
+wincertstore==0.2
+wrapt==1.11.2
