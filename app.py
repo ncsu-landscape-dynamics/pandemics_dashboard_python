@@ -32,8 +32,8 @@ import seaborn as sns
 #import pydot
 #from networkx.drawing.nx_pydot import graphviz_layout
 
-#filepath = input("Enter path to folder containing header.csv and subfolders of run data  :    ")
-filepath = r"Q:\Shared drives\APHIS  Projects\Pandemic\Data\slf_model\outputs\time_lags"
+filepath = input("Enter path to folder containing header.csv and subfolders of run data  :    ")
+#filepath = r"Q:\Shared drives\APHIS  Projects\Pandemic\Data\slf_model\outputs\time_lags"
 header_path = os.path.join(filepath, 'header.csv')
 header = pd.read_csv(header_path)
 
