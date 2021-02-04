@@ -37,14 +37,14 @@ pio.templates.default = "none"
 #import pydot
 #from networkx.drawing.nx_pydot import graphviz_layout
 
-#filepath = input("Enter path to folder containing header.csv and subfolders of run data  :    ")
-filepath = r"Q:\Shared drives\APHIS  Projects\Pandemic\Data\slf_model\outputs\time_lags"
+filepath = input("Enter path to folder containing header.csv and subfolders of run data  :    ")
+#filepath = r"Q:\Shared drives\APHIS  Projects\Pandemic\Data\slf_model\outputs\time_lags"
 header_path = os.path.join(filepath, 'header.csv')
 header = pd.read_csv(header_path)
-
+'''
 with open('Q:\Shared drives\APHIS  Projects\Pandemic\Data\DASHboard\countries_revised_wHost_filtered_reindex.json') as f:
   geometry = json.load(f)
-
+'''
 token = 'pk.eyJ1IjoidGhvbXdvcm0iLCJhIjoiY2s2bDY1ZXJyMDhrbTNqbjB6YWV4ZG91dyJ9.RRKk7tlQbdvJBLWnXwG9QA'
 
 
