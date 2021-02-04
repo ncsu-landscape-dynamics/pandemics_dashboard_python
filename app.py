@@ -38,7 +38,7 @@ pio.templates.default = "none"
 #from networkx.drawing.nx_pydot import graphviz_layout
 
 filepath = input("Enter path to folder containing header.csv and subfolders of run data  :    ")
-#filepath = r"Q:\Shared drives\APHIS  Projects\Pandemic\Data\slf_model\outputs\time_lags"
+#filepath = r"Q:\Shared drives\APHIS  Projects\Pandemic\Data\slf_model\outputs\slf"
 header_path = os.path.join(filepath, 'header.csv')
 header = pd.read_csv(header_path)
 '''
@@ -606,14 +606,22 @@ def update_graph_individual( year_selection_slider, attr_selection, run_slider, 
 )
 def multi_tree_graph(selected_attr_list, year_selection_slider, uspath):
     
-    fig = make_subplots(rows = len(selected_attr_list), cols = 4, print_grid = False, shared_xaxes=True, shared_yaxes=True)
 
     attr_dict = {}
     for i in range(len(attr_list)):
         attr_dict[attr_list[i]] = i
+    
+    for i in selected_attr_list:
+        ncol = 4
+        if literal_eval(header[header.attributes.str.contains('num_runs')].values[0,2])[attr_dict[i]] < 4:
+            ncol = literal_eval(header[header.attributes.str.contains('num_runs')].values[0,2])[attr_dict[i]]
+    fig = make_subplots(rows = len(selected_attr_list), cols = ncol, print_grid = False, shared_xaxes=True, shared_yaxes=True)
 
     for attr_i  in range(len(selected_attr_list)):
-        for col in range (4):
+
+        for col in range (ncol):
+            
+            
             od_data, probability_data = get_pandemic_data_files(filepath, attr_dict[selected_attr_list[attr_i]], col, attr_list)
             emergent_countries = literal_eval(header[header.attributes.str.contains('starting_countries')].values[0,2])
             emergent_countries = emergent_countries[attr_dict[selected_attr_list[attr_i]]]
@@ -630,8 +638,12 @@ def multi_tree_graph(selected_attr_list, year_selection_slider, uspath):
             sub_fig, edge_trace_list = draw_network(tree, G, H , country_selection, year_selection_slider, probability_data, total_intros_dict, master_node_intros, country_codes_dict, uspath)
             for trace in edge_trace_list:
                 fig.add_trace(trace,  attr_i+1, col+1)
-
+                fig.append_trace(sub_fig['data'][0], attr_i+1, col+1)
+        
+            dat = go.Scatter() 
+            sub_fig = go.Figure(data = dat)
             fig.append_trace(sub_fig['data'][0], attr_i+1, col+1)
+        
 
             rowtitle = " "
             if col + 1  == 1:
@@ -690,7 +702,6 @@ def update__map(attr, year_selection_slider, iteration):
 
     probability_column =  probability_data[prob_select]
 
-    print(geometry["features"][0]["properties"])
 
     '''
     fig = px.choropleth_mapbox(probability_data, geojson=geometry, color=prob_select,
@@ -712,10 +723,11 @@ def update__map(attr, year_selection_slider, iteration):
                     
                     paper_bgcolor = '#19191a', geo_bgcolor="#19191a")
 
-    data = go.Choropleth(locations=probability_data['ISO3'], locationmode='ISO-3', z=probability_data[prob_select], colorscale=colorscale,  colorbar={'title': 'Cases of COVID-19'})
+    data = go.Choropleth(locations=probability_data['ISO3'], locationmode='ISO-3', z=probability_data[prob_select], colorscale=colorscale,  colorbar={'title': ''})
 
     fig = go.Figure(data=data, layout=layout)
     fig.update_layout(height = 1250) #sets fig size - could potentially be adaptive)
+    fig.update_geos(projection_type="robinson")
     return dcc.Graph(figure=fig)
 '''
 @app.callback(
