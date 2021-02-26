@@ -34,7 +34,7 @@ def get_pandemic_data_files(filepath, attr_set, iteration, attr_list):
         'origin_destination.csv')
     input_data = pd.read_csv(odFilepath)
     input_data['Year'] = input_data['TS'].astype(str).str[:4]
-
+    input_data['Year'] = input_data['Year'].astype(int)
     odFilepath2 =  os.path.join(filepath, parFolder, iterFolder, 
         'pandemic_output_aggregated.csv')
     probability_data = pd.read_csv(odFilepath2, index_col=0, header = 0) # This is the input for probabilities, aggregated to year. 

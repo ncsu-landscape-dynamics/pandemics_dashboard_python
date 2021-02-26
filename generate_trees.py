@@ -3,6 +3,10 @@ import numpy as np
 from hierarchy_pos import hierarchy_pos
 import plotly.graph_objects as go
 from addEdge import addEdge
+import pandas as pd
+import os
+
+here = os.path.dirname(os.path.abspath(__file__))
 
 def generate_networks(emergent_countries, input_data, year_selection_slider):
     total_intros_dict = {}
@@ -79,29 +83,17 @@ def generate_networks(emergent_countries, input_data, year_selection_slider):
     return G, H, total_intros_dict, introduction_tally
 
 
-def country_codes(input_data, country_names_file, emergent_countries):
+def country_codes():
+    #takes custom data file made from probability file 
+    names_data  = pd.read_csv('country_names.csv')
     
-    uniqueorg = input_data['Origin'].unique()
-    uniquedest = input_data['Destination'].unique()
-    year_list = input_data.Year.unique()
-    frames = [uniqueorg, uniquedest]
-    country_list = np.concatenate(frames)
-    country_list = list(np.unique(country_list))
-
-    for i in emergent_countries:
-        if i not in country_list:
-            country_list.append(i)
     country_codes_dict = {}
     country_codes_dict['Origin'] = 'ORG'
-    for country in country_list:
-        namerow = country_names_file.loc[country_names_file['NAME'] == country] 
-        isorow = list(namerow['ISO3'])
-        isoname = 'NA'
-        if len(isorow) == 1:
-                isoname = isorow[0]
-        
+    for index, row in names_data.iterrows():
 
-        country_codes_dict[country] = isoname
+
+        country_codes_dict[row['NAME']] = row['ISO3']
+    country_codes_dict['Taiwan'] = 'TWN'
     return country_codes_dict
 
 def draw_network(tree, G, H, country_selection, year_selection_slider, probability_data, total_intros_dict, master_node_intros, country_codes_dict, uspath ):
@@ -341,7 +333,7 @@ def draw_network(tree, G, H, country_selection, year_selection_slider, probabili
     
 
     fig.update_layout(
-        height = 950, #sets fig size - could potentially be adaptive
+        height = 850, #sets fig size - could potentially be adaptive
         showlegend=False,
         annotations= annotations #shows iSO annotations
     )

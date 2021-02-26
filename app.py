@@ -25,33 +25,37 @@ from generate_trees import *
 import random
 import collections
 from datetime import datetime
-from statistics import mean, median
+from statistics import mean, median, mode
 from ast import literal_eval
 from dash.exceptions import PreventUpdate
 from collections import defaultdict
 import seaborn as sns 
 import json
 import plotly.io as pio
+from cartography_utility_functions import *
 pio.templates.default = "none"
 
 #import pydot
 #from networkx.drawing.nx_pydot import graphviz_layout
 
 filepath = input("Enter path to folder containing header.csv and subfolders of run data  :    ")
-#filepath = r"Q:\Shared drives\APHIS  Projects\Pandemic\Data\slf_model\outputs\slf"
+#filepath = r"Q:\Shared drives\Pandemic Data\outputs\slf_linearTrade_gamma4-1_hiiMask16_phyto0.3-0.8_wTWN"
+
+
 header_path = os.path.join(filepath, 'header.csv')
 header = pd.read_csv(header_path)
-'''
-with open('Q:\Shared drives\APHIS  Projects\Pandemic\Data\DASHboard\countries_revised_wHost_filtered_reindex.json') as f:
-  geometry = json.load(f)
-'''
-token = 'pk.eyJ1IjoidGhvbXdvcm0iLCJhIjoiY2s2bDY1ZXJyMDhrbTNqbjB6YWV4ZG91dyJ9.RRKk7tlQbdvJBLWnXwG9QA'
-
 
 year_list = range(2010,2018)
-
 country_names_file = pd.read_csv('iso3_un.csv', index_col=0) #crosswalk file for 3 -letter iso / country names. No need to change.
 attr_list = literal_eval(header[header.attributes.str.contains('run_prefix')].values[0,2])
+od_initialize, prob_initialize = get_pandemic_data_files(filepath, 0, 0, attr_list)
+country_codes_dict = country_codes()
+
+
+
+
+
+
 
 app = dash.Dash(__name__, assets_folder='assets')
 app.config.suppress_callback_exceptions = True
@@ -64,7 +68,7 @@ html.Div(
 [ dcc.Markdown("""***Attribute Set***"""), 
     dcc.Dropdown(
         id='attr_dropdown',
-        
+        persistence=True,
         options = [{'label':attr_list[i], 'value':i} for i in range(len(attr_list))],
         style=
                                     { 
@@ -74,7 +78,7 @@ html.Div(
         value = 0
        
         )
-])
+],  style={'padding': '0px 20px 20px 20px'} )
         ,
 
 
@@ -82,13 +86,14 @@ html.Div(
 [ dcc.Markdown("""***Iteration***"""),
         dcc.Slider(
         id='run_slider',
+        persistence=True,
         min=0,
         step= 1,
         value = 0
         )
         
         
-        ]),
+        ],  style={'padding': '0px 20px 20px 20px'}),
 
         html.Div(
 [ dcc.Markdown("""***Year***"""),
@@ -96,21 +101,22 @@ html.Div(
 
         dcc.Slider(
         id='year_slider_individual',
-        
+        persistence=True,
         step= 1
         
-        )]),
+        )],  style={'padding': '0px 20px 20px 20px'}),
 html.Div(
 [            html.Button('Reset', id='reset_btn', n_clicks=0),
             dcc.Markdown("""***Layout***"""),
-        ]),
+        ],style={'padding': '0px 20px 20px 20px'}),
 
 html.Div(style={'fontColor':'white'}, children =
             dcc.Markdown("""***Path to United States***"""),  
         ),
-
+html.Div(
 dcc.RadioItems(
             id = "uspath",
+            persistence=True,
             className='radiobutton-group',
         options=[
         {'label': 'On ', 'value': 'on'},
@@ -120,7 +126,7 @@ dcc.RadioItems(
     value='off',
     labelStyle={'display': 'inline-block',
     }
-)  , 
+))  , 
 
 html.Div(style={'fontColor':'white'}, children =
             dcc.Markdown("""***All Introductions***"""),  
@@ -156,7 +162,7 @@ tab2 = html.Div([ html.Div(
     value='avg',
     labelStyle={'display': 'inline-block',
     }
-)]),
+)] ,style={'padding': '0px 20px 20px 20px'}),
 html.Div(
 [ 
         
@@ -171,7 +177,7 @@ html.Div(
     value='intros',
     labelStyle={'display': 'inline-block',
     }
-)]),
+)]  ,style={'padding': '0px 20px 20px 20px'} ),
 
 html.Div(
 [ 
@@ -183,14 +189,37 @@ html.Div(
             value=[attr for attr in attr_list],
             labelStyle={"display": "inline-block"},
         )
-])
+]  ,style={'padding': '0px 20px 20px 20px'})
     ])    
 
 tab4 = html.Div([
        
          
-html.Div(
-[ dcc.Markdown("""***Attribute Set***"""), 
+html.Div([ 
+    dcc.Markdown("""***Data Selection***"""),
+     dcc.RadioItems(
+            id = "data_type_map",
+            className='radiobutton-group',
+        options=[
+        {'label': 'Year of First Introduction', 'value': 'first'},
+        {'label': 'Reintroductions', 'value': 'reintro'},
+        {'label': 'Individual Runs', 'value': 'ind'}
+        
+    ],
+    value='first',
+    labelStyle={'display': 'inline-block',
+    }
+), 
+dcc.RadioItems(
+            id = "view_options_map",
+            className='radiobutton-group',
+        
+    
+    labelStyle={'display': 'inline-block'
+    }),
+    
+    
+    dcc.Markdown("""***Attribute Set***"""), 
     dcc.Dropdown(
         id='attr_dropdown_map',
         
@@ -203,23 +232,22 @@ html.Div(
         value = 0
        
         )
-])
+] ,style={'padding': '0px 20px 20px 20px'})
         ,
 
 
-html.Div(
-[ dcc.Markdown("""***Iteration***"""),
+html.Div( id = 'map_it_slider_container', children = [ dcc.Markdown("""***Iteration***"""), 
         dcc.Slider(
         id='run_slider_map',
         min=0,
         step= 1,
         value = 0
-        )
+        ), 
         
         
-        ]),
+        ], style= {'display': 'block'} ),
 
-        html.Div(
+        html.Div(id = 'map_year_slider_container', children = 
 [ dcc.Markdown("""***Year***"""),
 
 
@@ -228,7 +256,10 @@ html.Div(
         
         step= 1
         
-        )])])
+        )], style= {'display': 'block'})
+        
+        
+        ] ,style={'padding': '0px 20px 20px 20px'})
 
 def multi_tree_attributes(attr_list):
     if len(attr_list) < 4:
@@ -241,7 +272,7 @@ multi_year_min  = int(min(literal_eval(header[header.attributes.str.contains('st
 
 multi_year_max = int(max(literal_eval(header[header.attributes.str.contains('stop_year')].values[0,2])))
 
-tab3 = html.Div([ html.Div(
+tab3 = html.Div([ html.Br(), html.Br(),html.Br(),html.Div(
 [ 
  dcc.Checklist(
             id="multi_tree_attr_list",
@@ -252,7 +283,7 @@ tab3 = html.Div([ html.Div(
             labelStyle={"display": "inline-block"},
         )
 
-]),
+],   style={'padding': '0px 20px 20px 20px'}),
         html.Div(
 [ dcc.Markdown("""***Year***"""),
 
@@ -262,10 +293,10 @@ tab3 = html.Div([ html.Div(
         min = multi_year_min,
         max = multi_year_max,
         step= 1,
-        value = multi_year_min,
+        value = multi_year_max,
         marks = dict((int(i), str(i)) for i in range(multi_year_min, multi_year_max))
         
-        )]),
+        )] ,  style={'padding': '0px 20px 20px 20px'}),
         html.Div([
         dcc.RadioItems(
             id = "uspath_multi",
@@ -275,10 +306,10 @@ tab3 = html.Div([ html.Div(
         {'label': 'Off', 'value': 'off'},
         
     ],
-    value='off',
+    value='on',
     labelStyle={'display': 'inline-block',
     }
-)])  , 
+)] ,  style={'padding': '0px 20px 20px 20px'})  , 
 
 ])
 app.layout = html.Div([ # HTML layout of the app and slider info. See dash documentation for more
@@ -287,27 +318,36 @@ style={'backgroundColor': '#19191a', 'fontColor':'white'},
 children=[
   
         
-    dcc.Tabs(id="tabs", value='tab_1', children=[
-        dcc.Tab(id="tab-1", label='Individual Runs/ Network', value='tab_1', children = [ html.Div(id='graph-1')]),
-        dcc.Tab(id="tab-2", label='Aggregate', value='tab_2', children = [ html.Div(id='graph-2')]),
-        dcc.Tab(id="tab-3", label='Multi-Tree', value='tab_3', children = [ html.Div(id='graph-3')]),
-        dcc.Tab(id="tab-4", label='Map', value='tab_4', children = [ html.Div(id='graph-4')])
+    dcc.Tabs(id="tabs", value='tab_4',className='custom-tabs', children=[
+        dcc.Tab(id="tab-4", label='Map', value='tab_4'  , className='custom-tab',selected_className='custom-tab--selected', children = [ html.Div(id='graph-4')]),
+        dcc.Tab(id="tab-1", label='Network', value='tab_1' , className='custom-tab',selected_className='custom-tab--selected', children = [ 
+            
+            dcc.Tabs(id="subtabs1", value='individual',  className='custom-tabs', children=[
+                dcc.Tab(label='First Introductions: Individual Runs', id='subtab1', value='individual', children =  html.Div(id='graph-1'), className='custom-tab',selected_className='custom-tab--selected'),
+                dcc.Tab(label='First Introductions: Multi', id='subtab2', value='multi', children =  html.Div(id='graph-3'), className='custom-tab', selected_className='custom-tab--selected'),
+
+            ])]),
+        dcc.Tab(id="tab-2", label='Aggregate', value='tab_2' , className='custom-tab',selected_className='custom-tab--selected',  children = [ html.Div(id='graph-2')])
+        
     ], colors={
         "border": "#2e1e18",
         "primary": "orange",
         "background": "#1f1c1a"
     }),
-    html.Div(id='tabs-content',
-             children = tab1)
+    html.Div(id='tabs-content')
 
     ])
 ])
 
 @app.callback(Output('tabs-content', 'children')
     ,
-             [dash.dependencies.Input('tabs', 'value')])
-def render_content(tab):
+             [dash.dependencies.Input('tabs', 'value'),
+             dash.dependencies.Input('subtabs1', 'value')])
+def render_content(tab, subtab):
     if tab == 'tab_1':
+        if subtab == 'multi':
+            return tab3
+       
         return tab1
     elif tab == 'tab_2':
         return tab2
@@ -343,7 +383,7 @@ def select_attr(attr_num):
     dict((int(i), 
     str(i)) for i in range(num_it)),
      start_y, 
-     stop_y, start_y,
+     stop_y, stop_y,
       dict((int(i), str(i)) for i in range(start_y, stop_y)) ))
 
 @app.callback([Output(component_id= 'run_slider_map', component_property='max'),
@@ -355,7 +395,7 @@ Output(component_id= 'year_slider_map', component_property= 'marks')],
 
 [dash.dependencies.Input('attr_dropdown_map', 'value')])
 
-def select_attr(attr_num):
+def select_attr_map(attr_num):
 
     #INDIVIDUAL SLIDERS
     num_it = literal_eval(header[header.attributes.str.contains('num_runs')].values[0,2])
@@ -372,7 +412,7 @@ def select_attr(attr_num):
     dict((int(i), 
     str(i)) for i in range(num_it)),
      start_y, 
-     stop_y, start_y,
+     stop_y, stop_y,
       dict((int(i), str(i)) for i in range(start_y, stop_y)) ))
 
     
@@ -544,14 +584,13 @@ def update_graph_individual( year_selection_slider, attr_selection, run_slider, 
     #GET DATA 
     od_data, probability_data = get_pandemic_data_files(filepath, attribute_selected_single, run_slider, attr_list)
 
-    emergent_countries = literal_eval(header[header.attributes.str.contains('starting_countries')].values[0,2])
-    emergent_countries = emergent_countries[attribute_selected_single]
+    starting_countries = literal_eval(header[header.attributes.str.contains('starting_countries')].values[0,2])
+    starting_countries = starting_countries[attribute_selected_single]
     country_selection = 'Origin'
 
 
     #Gernerate Networks
-    country_codes_dict = country_codes(od_data,country_names_file, emergent_countries )
-    G, H, total_intros_dict, introduction_tally = generate_networks(emergent_countries, od_data, year_selection_slider)
+    G, H, total_intros_dict, introduction_tally = generate_networks(starting_countries, od_data, year_selection_slider)
 
     master_node_intros = nx.get_node_attributes(H,'num_introductions')
     master_node_intros[country_selection] = 9999 #allows coloring of root node of tree
@@ -623,14 +662,13 @@ def multi_tree_graph(selected_attr_list, year_selection_slider, uspath):
             
             
             od_data, probability_data = get_pandemic_data_files(filepath, attr_dict[selected_attr_list[attr_i]], col, attr_list)
-            emergent_countries = literal_eval(header[header.attributes.str.contains('starting_countries')].values[0,2])
-            emergent_countries = emergent_countries[attr_dict[selected_attr_list[attr_i]]]
+            starting_countries = literal_eval(header[header.attributes.str.contains('starting_countries')].values[0,2])
+            starting_countries = starting_countries[attr_dict[selected_attr_list[attr_i]]]
             country_selection = 'Origin'
 
 
             #Gernerate Networks
-            country_codes_dict = country_codes(od_data,country_names_file, emergent_countries )
-            G, H, total_intros_dict, introduction_tally = generate_networks(emergent_countries, od_data, year_selection_slider)
+            G, H, total_intros_dict, introduction_tally = generate_networks(starting_countries, od_data, year_selection_slider)
 
             master_node_intros = nx.get_node_attributes(H,'num_introductions')
             master_node_intros[country_selection] = 9999 #allows coloring of root node of tree
@@ -659,7 +697,7 @@ def multi_tree_graph(selected_attr_list, year_selection_slider, uspath):
 
 
         fig.update_layout(
-        height = 1250, #sets fig size - could potentially be adaptive
+        height = 900, #sets fig size - could potentially be adaptive
         showlegend=False,
         #annotations= annotations, #shows iSO annotations
         plot_bgcolor='#19191a',
@@ -675,60 +713,327 @@ def multi_tree_graph(selected_attr_list, year_selection_slider, uspath):
 
     
     
-   
     return dcc.Graph(figure=fig)
 
-        
+@app.callback(
+   [Output(component_id='map_it_slider_container', component_property='style'),
+   Output(component_id='view_options_map', component_property='options'),
+   Output(component_id='view_options_map', component_property='value')],
+   [Input(component_id='data_type_map', component_property='value')])
+def show_hide_element(selected_data):
+    if selected_data == 'ind':
+        return [{'display': 'block'}, [{'label': 'Probability of Introduction', 'value': 'intro'}], 'intro']
+    if selected_data == 'first':
+        return [{'display': 'none'}, 
+        [
+                {'label': 'Mode', 'value': 'mode'},
+                {'label': 'St. Dev.', 'value': 'sd'},
+                {'label': 'Minimum', 'value': 'min'},
+                {'label': 'Mean', 'value': 'mean'},
+                {'label': 'Prop. Runs w/ an Introduction', 'value': 'prop'},
+                {'label': 'Prop. Runs w/ an Introduction > 50%', 'value': 'prop50'}
+                ], 'prop50']
+
+    if selected_data == 'reintro':
+        return [{'display': 'none'},
+        [
+                {'label': 'Mean Num. Reintros', 'value': 'mean_re'},
+                {'label': 'Range of Num. Reintros', 'value': 'range_re'}
+                ], 'mean_re']
+@app.callback(
+    Output(component_id='map_year_slider_container', component_property = 'style'),
+    [Input(component_id = 'view_options_map', component_property= 'value'),
+    Input(component_id= 'data_type_map', component_property = 'value')]
+)
+def show_hide_year_slider_map(view_opts, data_type):
+    if view_opts == 'prop' or data_type == 'ind':
+        return {'display': 'block'}
+    else:
+        return{'display': 'none'}
+
    
 @app.callback(
     Output('graph-4', 'children'),
     [
         Input('attr_dropdown_map', 'value'),
         Input('year_slider_map', 'value'),
-        Input('run_slider_map', 'value')
+        Input('run_slider_map', 'value'),
+        Input('view_options_map', 'value'), 
+        Input('data_type_map', 'value')
     ]
 )
-def update__map(attr, year_selection_slider, iteration):
-
+def update_map(attr_num, year_selection_slider, iteration, view_options, data_type):
     if year_selection_slider == None:
         raise PreventUpdate
+    num_it = literal_eval(header[header.attributes.str.contains('num_runs')].values[0,2])[attr_num]
+    starting_countries = literal_eval(header[header.attributes.str.contains('starting_countries')].values[0,2])[attr_num]
+    if data_type == 'first':
+        if view_options == 'prop' or view_options == 'prop50': #for proportion of runs w/introduction
+            temp_od_data, temp_probability_data = get_pandemic_data_files(filepath, attr_num, iteration, attr_list )
+            #create dict of all countries 
+
+            proportion_runs_dict = {}
+            for index, row in temp_probability_data.iterrows():
+                proportion_runs_dict[row['NAME']] = 0
+
+            for i in range(num_it):
+                od_data, probability_data = get_pandemic_data_files(filepath, attr_num, i, attr_list )
+                for country in proportion_runs_dict.keys():
+                    od_data = od_data.loc[od_data['Year'] <=  year_selection_slider]
+                    if country in list(od_data['Destination']):
+                        proportion_runs_dict[country] = proportion_runs_dict[country] +1
 
 
-    od_data, probability_data = get_pandemic_data_files(filepath, attr, iteration, attr_list )
-    prob_select = 'Agg Prob Intro '
-    prob_select = prob_select + str(year_selection_slider)
-    presence_select = "Presence "
-    presence_select = presence_select + str(year_selection_slider)
+            iso_column = []
+            data_column = []
+            for country in proportion_runs_dict:
+                try:
+                    if view_options == 'prop50':
+                        if proportion_runs_dict[country]/ num_it >= 0.5:
+                            iso_column.append(country_codes_dict[country])
+                            data_column.append(proportion_runs_dict[country]/ num_it)
+                    elif view_options == 'prop':
+                            iso_column.append(country_codes_dict[country])
+                            data_column.append(proportion_runs_dict[country]/ num_it)
+                except KeyError:
+                    continue
 
-    probability_column =  probability_data[prob_select]
+            
+            iso_column.append('PRI')
+            data_column.append(proportion_runs_dict['United States']/num_it)
+            if view_options == 'prop':
+                colorscale = ['#19191a',
+                            '#542206',
+                            '#742f10',
+                            '#913c0d',
+                            '#bd4300',
+                            '#ff2400']
+            if view_options == 'prop50':
+                colorscale = ['#542206',
+                            '#742f10',
+                            '#913c0d',
+                            '#bd4300',
+                            '#ff2400']
 
 
-    '''
-    fig = px.choropleth_mapbox(probability_data, geojson=geometry, color=prob_select,
-                           locations="ISO3", featureidkey="properties.ISO3",
-                           center={"lat": 45.5517, "lon": -73.7073},
-                           mapbox_style="carto-positron", zoom=9)
+            reverse_colorscale = False
+            title_text = 'Proportion of Runs With Introduction' +str(attr_list[attr_num])
+
     
-'''
-    colorscale = [
-        [0, 'rgba(77, 67, 58, .9)'],
-        [0.25, 'rgba(132, 82, 33, .8)'],
-        [0.5, 'rgba(194, 116, 37, .8)'], 
-        [0.75, 'rgba(213, 77, 40, .8)'],
-        [1.0, 'rgba(196, 37, 37, .8)']
-    ]
+            fig = draw_vector_map(title_text, iso_column, data_column, colorscale, reverse_colorscale)
 
-  
-    layout = dict(title='Probability', geo=dict(showframe=False, projection={'type': 'natural earth'}), plot_bgcolor='#19191a',
-                    
-                    paper_bgcolor = '#19191a', geo_bgcolor="#19191a")
+            return dcc.Graph(figure=fig)
+            #DONE - need 2 graph it
+        if view_options == 'mode' or view_options == 'sd' or view_options == 'min' or view_options == 'mean':
+            temp_od_data, temp_probability_data = get_pandemic_data_files(filepath, attr_num, iteration, attr_list )
+            #create dict of all countries 
 
-    data = go.Choropleth(locations=probability_data['ISO3'], locationmode='ISO-3', z=probability_data[prob_select], colorscale=colorscale,  colorbar={'title': ''})
+            data_dict = {}
+            for index, row in temp_probability_data.iterrows():
+                data_dict[row['NAME']] = []
 
-    fig = go.Figure(data=data, layout=layout)
-    fig.update_layout(height = 1250) #sets fig size - could potentially be adaptive)
-    fig.update_geos(projection_type="robinson")
-    return dcc.Graph(figure=fig)
+            for i in range(num_it):
+                od_data, probability_data = get_pandemic_data_files(filepath, attr_num, i, attr_list )
+                
+                for country in data_dict.keys():
+                        if country in list(od_data['Destination']):
+
+                            first = min(od_data.loc[od_data['Destination'] ==  country]['Year'])
+                            data_dict[country].append(first)
+            
+
+            print(data_dict)
+            colorscale = 'redor_r'
+            iso_column = []
+            data_column = []
+
+            if view_options == 'mode':
+                title_text = 'Mode of First Introduction Year : ' +str(attr_list[attr_num])
+                colorscale = ['#200019',
+                                '#350e1d',
+                                '#5e1524',
+                                '#891718',
+                                '#b81300',
+                                '#ff0000']
+                reverse_colors = True
+                for country in data_dict:
+                    try:
+                        if data_dict[country] != []:
+                            data_column.append(mode(data_dict[country]))
+                            iso_column.append(country_codes_dict[country])
+
+                        
+                    except KeyError:
+                        continue
+                if data_dict['United States'] != []:
+                
+                    iso_column.append('PRI')
+                    data_column.append(mode(data_dict['United States']))
+            if view_options == 'min':
+                title_text = 'Minimum of First Introduction Year : ' +str(attr_list[attr_num])
+                colorscale = ['#200000',
+                        '#350e00',
+                        '#5e1500',
+                        '#891700',
+                        '#b81d00',
+                        '#ff3100']
+                reverse_colors = True
+                for country in data_dict:
+                    try:
+                        if data_dict[country] != []:
+                            data_column.append(min(data_dict[country]))
+                            iso_column.append(country_codes_dict[country])
+
+                        
+                    except KeyError:
+                        continue
+                if data_dict['United States'] != []:
+                
+                    iso_column.append('PRI')
+                    data_column.append(min(data_dict['United States'])) 
+
+
+            if view_options == 'sd':
+                title_text = 'Standard Deviation of First Introduction Year : ' +str(attr_list[attr_num])
+                colorscale = 'ylorrd_r'
+                reverse_colors = True
+                for country in data_dict:
+                    try:
+                        if data_dict[country] != []:
+                            data_column.append(np.std(data_dict[country]) )
+                            #data_column.append(max(data_dict[country]) - min(data_dict[country])) Range, for future use
+                            iso_column.append(country_codes_dict[country])
+                    except KeyError:
+                        continue
+                if data_dict['United States'] != []:
+                
+                    iso_column.append('PRI')
+                    data_column.append(np.std(data_dict['United States']))
+
+            if view_options == 'mean':
+                title_text = 'Mean of First Introduction Year : ' +str(attr_list[attr_num])
+                colorscale = ['#200019',
+                        '#350e1d',
+                        '#5e1524',
+                        '#89172c',
+                        '#b81d37',
+                        '#ff3144']
+                reverse_colors = True
+                for country in data_dict:
+                    try:
+                        if data_dict[country] != []:
+                            data_column.append(mean(data_dict[country]))
+                            iso_column.append(country_codes_dict[country])
+                    except KeyError:
+                        continue
+                if data_dict['United States'] != []:
+                
+                    iso_column.append('PRI')
+                    data_column.append(mean(data_dict['United States']))
+
+            
+            fig = draw_vector_map(title_text, iso_column, data_column, colorscale, reverse_colors)
+
+            return dcc.Graph(figure=fig)
+            
+    if data_type == 'reintro':
+            temp_od_data, temp_probability_data = get_pandemic_data_files(filepath, attr_num, iteration, attr_list )
+            #create dict of all countries 
+
+            data_dict = {}
+            for index, row in temp_probability_data.iterrows():
+                data_dict[row['NAME']] = []
+
+            for i in range(num_it):
+                od_data, probability_data = get_pandemic_data_files(filepath, attr_num, i, attr_list )
+                
+                for country in data_dict.keys():
+                        if country in list(od_data['Destination']):
+
+                            num_reintros = len(od_data.loc[od_data['Destination'] ==  country]['Year']) -1 
+
+                            data_dict[country].append(num_reintros)
+            
+            
+            iso_column = []
+            data_column = []
+            colorscale = 'blugrn'
+            title_text = 'placeholder'
+            hover_text = []
+            print(data_dict)
+            if view_options == 'mean_re':
+                colorscale = 'darkmint_r'
+                title_text = 'Mean Number of Reintroductions: ' +str(attr_list[attr_num])
+                for country in data_dict:
+                    try:
+                        if data_dict[country] != []:
+                            
+                            data_column.append(mean(data_dict[country]))
+                            iso_column.append(country_codes_dict[country])
+                            hover_text.append('foo')
+
+                        
+                    except KeyError:
+                        continue
+                if data_dict['United States'] != []:
+                
+                    #iso_column.append('PRI')
+                    data_column.append(mean(data_dict['United States']))
+                    hover_text.append('foo')
+            if view_options == 'range_re':
+                title_text = 'Range in Number of Reintroductions:  ' +str(attr_list[attr_num])
+                colorscale = ['#002d24',
+                            '#104a5e',
+                            '#1b7795',
+                            '#299cb5',
+                            '#23c2c3',
+                            '#00ffcc']
+                for country in data_dict:
+                    try:
+                        if data_dict[country] != []:
+                            data_column.append(max(data_dict[country]) - min(data_dict[country]))
+                            iso_column.append(country_codes_dict[country])
+
+                        
+                    except KeyError:
+                        continue
+                if data_dict['United States'] != []:
+                
+                    iso_column.append('PRI')
+                    data_column.append(max(data_dict['United States']) - min(data_dict['United States'])) 
+            fig = draw_vector_map(title_text, iso_column, data_column, colorscale)
+            return dcc.Graph(figure=fig)
+    if data_type == 'ind':
+        od_data, probability_data = get_pandemic_data_files(filepath, attr_num, iteration, attr_list )
+        prob_select = 'Agg Prob Intro '
+        prob_select = prob_select + str(year_selection_slider)
+        presence_select = "Presence "
+        presence_select = presence_select + str(year_selection_slider)
+        probability_column =  list(probability_data[prob_select])
+        iso_column =  list(probability_data['ISO3'])
+        ######### Countries not covered in data:
+                                                                                #110m Natural Earth political product, not the UN
+
+        #Somaliland - lumped with somalia
+
+        #probability_column.append(probability_data.loc[probability_data['ISO3'] == 'SOM'][prob_select].item())
+        #iso_column.append('SOM')
+
+        probability_column.append(probability_data.loc[probability_data['ISO3'] == 'USA'][prob_select].item())
+        iso_column.append('PRI')
+
+        title_text = 'Probability of Introduction: ' +str(attr_list[attr_num])
+        colorscale = ['#19191a',
+    '#492071',
+    '#7f1ba1',
+    '#a90ba3',
+    '#ce038c',
+    '#f40d70']
+        reverse_colorscale = False
+
+    
+        fig = draw_vector_map(title_text, iso_column, probability_column, colorscale, reverse_colorsc)
+        return dcc.Graph(figure=fig)
 '''
 @app.callback(
 
