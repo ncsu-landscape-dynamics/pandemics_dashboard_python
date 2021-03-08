@@ -1,1 +1,2 @@
-# Pandemics_Graph_Viz
+# Pandemics Dashbaord
+#Run With app.py
