@@ -36,13 +36,15 @@ import pickle
 import preprocess_pandemic_viz_data
 import time
 
-pio.templates.default = "none"
-
 # import pydot
 # from networkx.drawing.nx_pydot import graphviz_layout
+#  #These are a tremendous hassle to install and require a remakrable number\
+# Of dependencies - ideally will not be used
+
 
 # filepath = input("Enter path to folder containing header.csv and subfolders of run data  :    ")
-filepath = r"Q:\Shared drives\Pandemic Data\outputs\slf_gamma4-1_alpha0.194_lamda3.2_hiiMask16_phyto0.3-0.8_wTWN"
+filepath = r"H:\Shared drives\Pandemic Data\outputs\slf_gamma4-1_alpha0.194_lamda3.2_hiiMask16_phyto0.3-0.8_wTWN"
+pio.templates.default = "none"
 
 
 header_path = os.path.join(filepath, "header.csv")
