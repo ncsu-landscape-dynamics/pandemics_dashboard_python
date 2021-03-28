@@ -1,7 +1,7 @@
 import plotly.graph_objects as go
 
 
-def draw_vector_map(title, iso_column, data_column, colorscale, reverse_colors):
+def draw_vector_map(title, iso_column, data_column, colorscale, reverse_colors, labels):
     layout = dict(
         title=title,
         geo=dict(showframe=False, projection={"type": "natural earth"}),
@@ -16,6 +16,7 @@ def draw_vector_map(title, iso_column, data_column, colorscale, reverse_colors):
         colorscale=colorscale,
         colorbar={"title": ""},
         reversescale=reverse_colors,
+        text=labels,
     )
     fig = go.Figure(data=data, layout=layout)
     fig.update_layout(
@@ -30,4 +31,3 @@ def draw_vector_map(title, iso_column, data_column, colorscale, reverse_colors):
         countrycolor="grey",
     )
     return fig
-

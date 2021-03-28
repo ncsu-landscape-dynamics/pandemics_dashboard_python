@@ -2,7 +2,8 @@ import sys
 
 import os
 import pandas as pd
-from colour import Color
+
+# from colour import Color
 import numpy as np
 import math
 import networkx as nx
@@ -43,29 +44,25 @@ import time
 
 
 # filepath = input("Enter path to folder containing header.csv and subfolders of run data  :    ")
-filepath = r"H:\Shared drives\Pandemic Data\outputs\slf_gamma4-1_alpha0.194_lamda3.2_hiiMask16_phyto0.3-0.8_wTWN"
+filepath = r"H:\Shared drives\Pandemic Data\slf_model\outputs\slf_scenarios"
 pio.templates.default = "none"
 
 
 header_path = os.path.join(filepath, "header.csv")
 header = pd.read_csv(header_path)
 
-country_names_file = pd.read_csv(
-    "iso3_un.csv", index_col=0
-)  # crosswalk file for 3 -letter iso / country names. No need to change.
+# country_names_file = pd.read_csv(
+#    "iso3_un.csv", index_col=0
+# )  # crosswalk file for 3 -letter iso / country names. No need to change.
 attr_list = literal_eval(
     header[header.attributes.str.contains("run_prefix")].values[0, 2]
 )
 od_initialize, prob_initialize = get_pandemic_data_files(filepath, 0, 0, attr_list)
 country_codes_dict = country_codes()
 
-viz_data_path = os.path.join(filepath, "viz_data")
-if os.path.isdir(viz_data_path) == True:
-    carto_data = pickle.load(open(os.path.join(viz_data_path, "carto_data.p"), "rb"))
-else:
-    preprocess_pandemic_viz_data.generate_viz_data(filepath)
+viz_data_path = os.path.join(filepath, "summary_data")
 
-
+summary_data = pickle.load(open(os.path.join(viz_data_path, "summary_data.p"), "rb"))
 app = dash.Dash(__name__, assets_folder="assets")
 app.config.suppress_callback_exceptions = True
 app.title = "Pandemics Dashboard"
@@ -83,7 +80,10 @@ tab1 = html.Div(
                         {"label": attr_list[i], "value": i}
                         for i in range(len(attr_list))
                     ],
-                    style={"color": "#212121", "background-color": "#212121",},
+                    style={
+                        "color": "#212121",
+                        "background-color": "#212121",
+                    },
                     value=0,
                 ),
             ],
@@ -124,7 +124,9 @@ tab1 = html.Div(
                     {"label": "Off", "value": "off"},
                 ],
                 value="off",
-                labelStyle={"display": "inline-block",},
+                labelStyle={
+                    "display": "inline-block",
+                },
             )
         ),
         html.Div(
@@ -182,11 +184,13 @@ tab2 = html.Div(
                     className="radiobutton-group",
                     options=[
                         {"label": "Averages", "value": "avg"},
-                        {"label": "All", "value": "all"},
-                        {"label": "Runs Only", "value": "runs"},
+                        {"label": "All (slow 30s per attr)", "value": "all"},
+                        {"label": "Runs Only (slow 30s per attr)", "value": "runs"},
                     ],
                     value="avg",
-                    labelStyle={"display": "inline-block",},
+                    labelStyle={
+                        "display": "inline-block",
+                    },
                 )
             ],
             style={"padding": "0px 20px 20px 20px"},
@@ -197,11 +201,16 @@ tab2 = html.Div(
                     id="aggregate_data_select",
                     className="radiobutton-group",
                     options=[
-                        {"label": "Introductions/ Timestep", "value": "intros"},
-                        {"label": "Total Countries", "value": "countries"},
+                        {
+                            "label": "Introductions/ Timestep",
+                            "value": "num_introductions",
+                        },
+                        {"label": "Total Countries", "value": "num_countries"},
                     ],
-                    value="intros",
-                    labelStyle={"display": "inline-block",},
+                    value="num_introductions",
+                    labelStyle={
+                        "display": "inline-block",
+                    },
                 )
             ],
             style={"padding": "0px 20px 20px 20px"},
@@ -234,7 +243,9 @@ tab4 = html.Div(
                         {"label": "Individual Runs", "value": "ind"},
                     ],
                     value="first",
-                    labelStyle={"display": "inline-block",},
+                    labelStyle={
+                        "display": "inline-block",
+                    },
                 ),
                 dcc.RadioItems(
                     id="view_options_map",
@@ -248,7 +259,10 @@ tab4 = html.Div(
                         {"label": attr_list[i], "value": i}
                         for i in range(len(attr_list))
                     ],
-                    style={"color": "#212121", "background-color": "#212121",},
+                    style={
+                        "color": "#212121",
+                        "background-color": "#212121",
+                    },
                     value=0,
                 ),
             ],
@@ -332,7 +346,9 @@ tab3 = html.Div(
                         {"label": "Off", "value": "off"},
                     ],
                     value="on",
-                    labelStyle={"display": "inline-block",},
+                    labelStyle={
+                        "display": "inline-block",
+                    },
                 )
             ],
             style={"padding": "0px 20px 20px 20px"},
@@ -352,7 +368,7 @@ app.layout = html.Div(
                     children=[
                         dcc.Tab(
                             id="tab-4",
-                            label="Map",
+                            label="Geographic",
                             value="tab_4",
                             className="custom-tab",
                             selected_className="custom-tab--selected",
@@ -392,7 +408,7 @@ app.layout = html.Div(
                         ),
                         dcc.Tab(
                             id="tab-2",
-                            label="Aggregate",
+                            label="Temporal",
                             value="tab_2",
                             className="custom-tab",
                             selected_className="custom-tab--selected",
@@ -460,10 +476,13 @@ def select_attr(attr_num):
     num_it = num_it[attr_num]
     start_y = int(start_y[attr_num])
     stop_y = int(stop_y[attr_num])
-
+    if num_it > 100:
+        run_slider_max = 100
+    else:
+        run_slider_max = num_it
     return list(
         (
-            num_it,
+            run_slider_max,
             dict((int(i), str(i)) for i in range(num_it)),
             start_y,
             stop_y,
@@ -591,75 +610,25 @@ def update_graph_aggregate(view, attributes_selected, data_selected):
                     )
 
     if view == "avg" or view == "all":
-        for i in range(len(attr_list)):
-            if attr_list[i] in attributes_selected:
-                run_iterations = literal_eval(
-                    header[header.attributes.str.contains("num_runs")].values[0, 2]
+        print(attributes_selected)
+        for attr in attributes_selected:
+            # print(i)
+            print(attr)
+            dates = summary_data[attr]["aggregate"][data_selected]["dates"]
+            data = summary_data[attr]["aggregate"][data_selected]["data"]
+            if data_selected == "num_introductions":
+                title = "Average Number of Introductions per Time Step : " + attr
+            elif data_selected == "num_countries":
+                title = "Average Number of Introductions per Time Step : " + attr
+            fig.add_trace(
+                go.Scatter(
+                    x=dates,
+                    y=data,
+                    line_color=colors_dict[attr],
+                    line_width=5,
+                    name=attr,
                 )
-                run_iterations = run_iterations[i]
-                unique_dates = []
-                date_values = {}
-
-                for n in range(run_iterations):
-                    parFolder = str(attr_list[i])
-                    iterFolder = "run_" + str(n)
-                    odFilepath = os.path.join(
-                        filepath, parFolder, iterFolder, "origin_destination.csv"
-                    )
-                    run_intros_dict = {}
-                    od_data = pd.read_csv(odFilepath)
-                    countries_list = literal_eval(
-                        header[
-                            header.attributes.str.contains("starting_countries")
-                        ].values[0, 2]
-                    )
-
-                    for index, row in od_data.iterrows():
-
-                        year = int(str(row["TS"])[:4])
-
-                        month = int(str(row["TS"])[4:6])
-                        date = datetime(year=year, month=month, day=1)
-                        if data_selected == "intros":
-                            if date in run_intros_dict:
-                                run_intros_dict[date] = run_intros_dict[date] + 1
-                            else:
-                                run_intros_dict[date] = 1
-                        else:
-                            dest = str(row["Destination"])
-                            if dest not in countries_list:
-                                countries_list.append(dest)
-                            run_intros_dict[date] = len(countries_list)
-
-                    # all_intros_dict = sorted(all_intros_dict.items())
-                    # years, intros = zip(*all_intros_dict)
-                    for key in run_intros_dict:
-                        if key not in date_values:
-                            date_values[key] = [run_intros_dict[key]]
-                        else:
-                            date_values[key].append(run_intros_dict[key])
-                for key in date_values:
-                    date_values[key] = mean(date_values[key])
-
-                date_values = sorted(date_values.items())
-                years, intros = zip(*date_values)
-                if data_selected == "countries":
-                    intros = list(intros)
-
-                    for g in range(len(intros)):
-                        if g > 0:
-                            if intros[g] < intros[g - 1]:
-                                intros[g] = intros[g - 1]
-
-                fig.add_trace(
-                    go.Scatter(
-                        x=years,
-                        y=intros,
-                        line_color=colors[i],
-                        line_width=5,
-                        name=attr_list[i],
-                    )
-                )
+            )
 
     fig.update_layout(
         height=850,  # sets fig size - could potentially be adaptive
@@ -668,6 +637,8 @@ def update_graph_aggregate(view, attributes_selected, data_selected):
         paper_bgcolor="#19191a",
         yaxis=dict(color="white"),
         xaxis=dict(color="white"),
+        title=title,
+        title_font_color="white",
     )
 
     return dcc.Graph(figure=fig)
@@ -984,8 +955,12 @@ def update_map(attr_num, year_selection_slider, iteration, view_options, data_ty
         if (
             view_options == "fi_prop" or view_options == "fi_prop50"
         ):  # for proportion of runs w/introduction
-            iso_column = carto_data[attr_list[attr_num]][view_options]["ISO"]
-            data_column = carto_data[attr_list[attr_num]][view_options]["data"]
+            iso_column = summary_data[attr_list[attr_num]]["cartographic"]["data"][
+                view_options
+            ]["ISO"]
+            data_column = summary_data[attr_list[attr_num]]["cartographic"]["data"][
+                view_options
+            ]["data"]
             if view_options == "fi_prop":
                 title_text = "Proportion of Runs With Introduction" + str(
                     attr_list[attr_num]
@@ -1005,9 +980,19 @@ def update_map(attr_num, year_selection_slider, iteration, view_options, data_ty
                 colorscale = ["#542206", "#742f10", "#913c0d", "#bd4300", "#ff2400"]
 
             reverse_colorscale = False
+            labels = []
+            for i in iso_column:
+                labels.append(
+                    summary_data[attr_list[attr_num]]["cartographic"]["labels"][i]
+                )
 
             fig = draw_vector_map(
-                title_text, iso_column, data_column, colorscale, reverse_colorscale
+                title_text,
+                iso_column,
+                data_column,
+                colorscale,
+                reverse_colorscale,
+                labels,
             )
 
             return dcc.Graph(figure=fig)
@@ -1038,8 +1023,12 @@ def update_map(attr_num, year_selection_slider, iteration, view_options, data_ty
                     "#ff0000",
                 ]
                 reverse_colors = True
-                iso_column = carto_data[attr_list[attr_num]][view_options]["ISO"]
-                data_column = carto_data[attr_list[attr_num]][view_options]["data"]
+                iso_column = summary_data[attr_list[attr_num]]["cartographic"]["data"][
+                    view_options
+                ]["ISO"]
+                data_column = summary_data[attr_list[attr_num]]["cartographic"]["data"][
+                    view_options
+                ]["data"]
             if view_options == "fi_min":
                 title_text = "Minimum of First Introduction Year : " + str(
                     attr_list[attr_num]
@@ -1053,8 +1042,12 @@ def update_map(attr_num, year_selection_slider, iteration, view_options, data_ty
                     "#ff3100",
                 ]
                 reverse_colors = True
-                iso_column = carto_data[attr_list[attr_num]][view_options]["ISO"]
-                data_column = carto_data[attr_list[attr_num]][view_options]["data"]
+                iso_column = summary_data[attr_list[attr_num]]["cartographic"]["data"][
+                    view_options
+                ]["ISO"]
+                data_column = summary_data[attr_list[attr_num]]["cartographic"]["data"][
+                    view_options
+                ]["data"]
 
             if view_options == "fi_std":
                 title_text = "Standard Deviation of First Introduction Year : " + str(
@@ -1062,8 +1055,12 @@ def update_map(attr_num, year_selection_slider, iteration, view_options, data_ty
                 )
                 colorscale = "ylorrd_r"
                 reverse_colors = True
-                iso_column = carto_data[attr_list[attr_num]][view_options]["ISO"]
-                data_column = carto_data[attr_list[attr_num]][view_options]["data"]
+                iso_column = summary_data[attr_list[attr_num]]["cartographic"]["data"][
+                    view_options
+                ]["ISO"]
+                data_column = summary_data[attr_list[attr_num]]["cartographic"]["data"][
+                    view_options
+                ]["data"]
 
             if view_options == "fi_mean":
                 title_text = "Mean of First Introduction Year : " + str(
@@ -1078,63 +1075,46 @@ def update_map(attr_num, year_selection_slider, iteration, view_options, data_ty
                     "#ff3144",
                 ]
                 reverse_colors = True
-                iso_column = carto_data[attr_list[attr_num]][view_options]["ISO"]
-                data_column = carto_data[attr_list[attr_num]][view_options]["data"]
+                iso_column = summary_data[attr_list[attr_num]]["cartographic"]["data"][
+                    view_options
+                ]["ISO"]
+                data_column = summary_data[attr_list[attr_num]]["cartographic"]["data"][
+                    view_options
+                ]["data"]
+            labels = []
+            for i in iso_column:
+                labels.append(
+                    summary_data[attr_list[attr_num]]["cartographic"]["labels"][i]
+                )
 
             fig = draw_vector_map(
-                title_text, iso_column, data_column, colorscale, reverse_colors
+                title_text,
+                iso_column,
+                data_column,
+                colorscale,
+                reverse_colors,
+                labels,
             )
-
             return dcc.Graph(figure=fig)
 
     if data_type == "reintro":
-        temp_od_data, temp_probability_data = get_pandemic_data_files(
-            filepath, attr_num, iteration, attr_list
-        )
+
         # create dict of all countries
 
-        data_dict = {}
-        for index, row in temp_probability_data.iterrows():
-            data_dict[row["NAME"]] = []
+        iso_column = summary_data[attr_list[attr_num]]["cartographic"]["data"][
+            view_options
+        ]["ISO"]
+        data_column = summary_data[attr_list[attr_num]]["cartographic"]["data"][
+            view_options
+        ]["data"]
 
-        for i in range(num_it):
-            od_data, probability_data = get_pandemic_data_files(
-                filepath, attr_num, i, attr_list
-            )
-
-            for country in data_dict.keys():
-                if country in list(od_data["Destination"]):
-
-                    num_reintros = (
-                        len(od_data.loc[od_data["Destination"] == country]["Year"]) - 1
-                    )
-
-                    data_dict[country].append(num_reintros)
-
-        iso_column = []
-        data_column = []
         colorscale = "blugrn"
         title_text = "placeholder"
         hover_text = []
         if view_options == "ri_mean":
             colorscale = "darkmint_r"
             reverse_colors = False
-            title_text = "Mean Number of Reintroductions: " + str(attr_list[attr_num])
-            for country in data_dict:
-                try:
-                    if data_dict[country] != []:
 
-                        data_column.append(mean(data_dict[country]))
-                        iso_column.append(country_codes_dict[country])
-                        hover_text.append("foo")
-
-                except KeyError:
-                    continue
-            if data_dict["United States"] != []:
-
-                # iso_column.append('PRI')
-                data_column.append(mean(data_dict["United States"]))
-                hover_text.append("foo")
         if view_options == "ri_range":
             title_text = "Range in Number of Reintroductions:  " + str(
                 attr_list[attr_num]
@@ -1148,23 +1128,15 @@ def update_map(attr_num, year_selection_slider, iteration, view_options, data_ty
                 "#00ffcc",
             ]
             reverse_colors = False
-            for country in data_dict:
-                try:
-                    if data_dict[country] != []:
-                        data_column.append(
-                            max(data_dict[country]) - min(data_dict[country])
-                        )
-                        iso_column.append(country_codes_dict[country])
 
-                except KeyError:
-                    continue
-            if data_dict["United States"] != []:
-
-                iso_column.append("PRI")
-                data_column.append(
-                    max(data_dict["United States"]) - min(data_dict["United States"])
-                )
-        fig = draw_vector_map(title_text, iso_column, data_column, colorscale)
+        labels = []
+        for i in iso_column:
+            labels.append(
+                summary_data[attr_list[attr_num]]["cartographic"]["labels"][i]
+            )
+        fig = draw_vector_map(
+            title_text, iso_column, data_column, colorscale, reverse_colors, labels
+        )
         return dcc.Graph(figure=fig)
     if data_type == "ind":
         od_data, probability_data = get_pandemic_data_files(
@@ -1193,8 +1165,14 @@ def update_map(attr_num, year_selection_slider, iteration, view_options, data_ty
         colorscale = ["#19191a", "#492071", "#7f1ba1", "#a90ba3", "#ce038c", "#f40d70"]
         reverse_colorscale = False
 
+        for i in iso_column:
+            print(i)
+            labels.append(
+                summary_data[attr_list[attr_num]]["cartographic"]["labels"][i]
+            )
+
         fig = draw_vector_map(
-            title_text, iso_column, probability_column, colorscale, reverse_colorscale
+            title_text, iso_column, data_column, colorscale, reverse_colorscale, labels
         )
         return dcc.Graph(figure=fig)
 
@@ -1210,4 +1188,3 @@ def update(reset):
 
 if __name__ == "__main__":
     app.run_server(debug=True)
-
