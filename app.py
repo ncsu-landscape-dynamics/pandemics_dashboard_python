@@ -18,7 +18,7 @@ from matplotlib.colors import ListedColormap, LinearSegmentedColormap
 import dash
 import dash_html_components as html
 import dash_core_components as dcc
-from dash.dependencies import Input, Output
+from dash.dependencies import Input, Output, State
 from addEdge import addEdge
 
 from generate_trees import *
@@ -36,6 +36,11 @@ from cartography_utility_functions import *
 import pickle
 import preprocess_pandemic_viz_data
 import time
+from summary_network_drawing import *
+import dash_cytoscape as cyto
+import matplotlib as mpl
+import matplotlib.cm as cm
+from cytoscape_stylesheets import *
 
 # import pydot
 # from networkx.drawing.nx_pydot import graphviz_layout
@@ -63,12 +68,12 @@ country_codes_dict = country_codes()
 viz_data_path = os.path.join(filepath, "summary_data")
 
 summary_data = pickle.load(open(os.path.join(viz_data_path, "summary_data.p"), "rb"))
-app = dash.Dash(__name__, assets_folder="assets")
-app.config.suppress_callback_exceptions = True
+app = dash.Dash(__name__, assets_folder="assets", suppress_callback_exceptions=True)
+
 app.title = "Pandemics Dashboard"
 server = app.server
 reset_click_tracker = 0
-tab1 = html.Div(
+fi_ind_tab_content = html.Div(
     [
         html.Div(
             [
@@ -175,7 +180,7 @@ tab1 = html.Div(
     ]
 )
 
-tab2 = html.Div(
+temporal_tab_content = html.Div(
     [
         html.Div(
             [
@@ -229,7 +234,7 @@ tab2 = html.Div(
     ]
 )
 
-tab4 = html.Div(
+geographic_tab_content = html.Div(
     [
         html.Div(
             [
@@ -304,7 +309,426 @@ multi_year_max = int(
     max(literal_eval(header[header.attributes.str.contains("stop_year")].values[0, 2]))
 )
 
-tab3 = html.Div(
+
+ri_network_tab_content = html.Div(
+    [
+        html.Br(),
+        html.Br(),
+        html.Br(),
+        html.Div(
+            [
+                dcc.Store(id="elements_storage"),
+                dcc.Store(id="graph_storage"),
+                dcc.Store(id="degree_cent_storage"),
+                dcc.Dropdown(
+                    id="ri_network_attr_dropdown",
+                    options=[
+                        {"label": attr_list[i], "value": i}
+                        for i in range(len(attr_list))
+                    ],
+                    style={
+                        "color": "#212121",
+                        "background-color": "#212121",
+                    },
+                    value=0,
+                ),
+            ],
+            style={"padding": "0px 20px 20px 20px"},
+        ),
+        html.Div(
+            [
+                dcc.Markdown("""***Highlight Style:***"""),
+                dcc.RadioItems(
+                    id="ri_network_highlight_style",
+                    className="radiobutton-group",
+                    options=[
+                        {"label": "Highlight ", "value": "highlight"},
+                        {"label": "focus", "value": "focus"},
+                    ],
+                    value="highlight",
+                    labelStyle={
+                        "display": "inline-block",
+                    },
+                ),
+                dcc.Markdown("""***Layout Style:***"""),
+                dcc.RadioItems(
+                    id="ri_network_layout_select",
+                    className="radiobutton-group",
+                    options=[
+                        {"label": "Force-Directed ", "value": "force"},
+                        {"label": "Shell", "value": "shell"},
+                    ],
+                    value="force",
+                    labelStyle={
+                        "display": "inline-block",
+                    },
+                ),
+            ],
+            style={"padding": "0px 20px 20px 20px"},
+        ),
+        html.Hr(),
+        html.Div(
+            [
+                dcc.Markdown("""***Filter Edges***"""),
+                dcc.Slider(id="ri_edge_weight_slider", min=0, value=0),
+                dcc.Markdown("""***Filter Nodes ***"""),
+                dcc.Markdown("""Proportion of Runs (uncertainty) > :"""),
+                dcc.Slider(
+                    id="ri_network_prop_slider",
+                    min=0,
+                    max=1,
+                    step=0.05,
+                    value=0,
+                    marks=dict([(i / 10, str(i / 10)) for i in range(0, 10)]),
+                ),
+                dcc.Markdown("""Degree Centrality (importance) > :"""),
+                dcc.Slider(id="ri_degree_centrality_slider", min=0, step=0.01, value=0),
+            ],
+            style={"padding": "0px 20px 20px 20px"},
+        ),
+        html.Div(
+            [
+                html.Hr(),
+                dcc.Markdown(
+                    """Force-directed optimal spacing (k) - used to "compress" graph :"""
+                ),
+                dcc.Input(
+                    id="ri_k_value",
+                    type="number",
+                    min=0,
+                    max=1000,
+                    debounce=True,
+                    placeholder="Try values 1-100 to start",
+                    value=None,
+                ),
+            ],
+            style={"padding": "0px 20px 20px 20px"},
+        ),
+    ]
+)
+
+
+@app.callback(
+    [
+        Output("ri_edge_weight_slider", "max"),
+        Output("ri_edge_weight_slider", "marks"),
+        Output("ri_degree_centrality_slider", "max"),
+        Output("ri_degree_centrality_slider", "marks"),
+    ],
+    Input("ri_network_attr_dropdown", "value"),
+)
+def populate_centraility_max(attr_num):
+    edge_weight = summary_data[attr_list[attr_num]]["network"]["max_edge_intros"]
+    edge_marks = dict(
+        [(i * 500, str(i * 500)) for i in range(2, int(edge_weight / 500))]
+    )
+    edge_marks[5] = "5"
+    edge_marks[10] = "10"
+    edge_marks[25] = "25"
+    edge_marks[50] = "50"
+    edge_marks[100] = "100"
+
+    max_degree = summary_data[attr_list[attr_num]]["network"]["max_degree_cent"]
+
+    degree_marks = dict(
+        [(i / 20, str(i / 20)) for i in range(0, int(max_degree * 20.0))]
+    )
+
+    return edge_weight, edge_marks, max_degree, degree_marks
+
+
+"""
+@app.callback(
+
+
+    [],
+    []
+)
+"""
+
+
+@app.callback(
+    [
+        Output("elements_storage", "data"),
+        Output("graph_storage", "data"),
+        Output("degree_cent_storage", "data"),
+    ],
+    [
+        dash.dependencies.Input("ri_network_attr_dropdown", "value"),
+        dash.dependencies.Input("ri_network_layout_select", "value"),
+        dash.dependencies.Input("ri_network_prop_slider", "value"),
+        dash.dependencies.Input("ri_degree_centrality_slider", "value"),
+        dash.dependencies.Input("ri_k_value", "value"),
+        dash.dependencies.Input("ri_edge_weight_slider", "value"),
+    ],
+)
+def all_intros_network_graph(
+    attr_num, layout, prop_slider, deg_centrality_slider, k_slider, edge_weight_slider
+):
+    G = summary_data[attr_list[attr_num]]["network"]["diGraph"]
+    starting_countries = literal_eval(
+        header[header.attributes.str.contains("starting_countries")].values[0, 2]
+    )[attr_num]
+    max_node_intros = summary_data[attr_list[attr_num]]["network"]["max_node_intros"]
+
+    graph_countries_list = starting_countries  # the list of selected countires to build a subgraph from. All starting countries are included
+    prop_dict = summary_data[attr_list[attr_num]]["network"]["prop_dict"]
+    degree_centrality = summary_data[attr_list[attr_num]]["network"]["degree_cent"]
+    for country in G.nodes():
+        if (
+            country not in starting_countries
+            and prop_dict[country] > prop_slider
+            and degree_centrality[country] > deg_centrality_slider
+        ):
+            graph_countries_list.append(country)
+    G = G.subgraph(graph_countries_list)
+    graph_edges_list = []
+    for edge in G.edges():
+        if G[edge[0]][edge[1]]["num_intros"] > edge_weight_slider:
+            graph_edges_list.append(edge)
+
+    G = nx.edge_subgraph(G, graph_edges_list)
+    elements = generate_cytoscape_elements(
+        G, country_codes_dict, degree_centrality, starting_countries
+    )
+    node_link = nx.node_link_data(G)
+
+    return elements, node_link, degree_centrality
+
+    '''
+    default_stylesheet = [
+        {
+            "selector": "node",
+            "style": {
+                # "width": "mapData(size, 0, 100, 20, 60)",
+                # "height": "mapData(size, 0, 100, 20, 60)",
+                "content": "data(label)",
+                "font-size": "12px",
+                "text-valign": "center",
+                "text-halign": "center",
+                "background-color": "mapData(total_intros, 0, max_node_intros, #2375fa,  green)",
+            },
+        },
+    ]
+
+    concentric_layout = {"name": "concentric", "startAngle": 0}
+    """
+    clockwise: true, 
+    minNodeSpacing: 10, 
+    avoidOverlap: true, 
+    nodeDimensionsIncludeLabels: false, 
+     
+    'concentric': function (node) { return node.degree();},
+    levelWidth: function (nodes) { return nodes.maxDegree() / 4;},
+    animate: false, 
+    animationDuration: 500, 
+    animationEasing: undefined, 
+    animateFilter: function (node, i) { return true; }, 
+    ready: undefined, 
+    stop: undefined, 
+    transform: function (node, position) { return position; } 
+    }
+
+    """
+    circle_layout = {"name": "circle", "radius": 250, "startAngle": 0}
+    '''
+
+
+@app.callback(
+    [
+        Output("cytoscape", "stylesheet"),
+        Output("cytoscape", "elements"),
+        Output("cytoscape", "layout"),
+        Output("cytoscape", "style"),
+    ],
+    [
+        Input("cytoscape", "tapNode"),
+        Input("cytoscape", "tapEdge"),
+        Input("cytoscape", "selectedNodeData"),
+        Input("cytoscape", "selectedEdgeData"),
+        dash.dependencies.Input("ri_network_attr_dropdown", "value"),
+        Input("ri_network_highlight_style", "value"),
+        Input("elements_storage", "data"),
+        Input("graph_storage", "data"),
+        Input("degree_cent_storage", "data"),
+    ],
+    [
+        State("cytoscape", "stylesheet"),
+        State("cytoscape", "elements"),
+        State("cytoscape", "layout"),
+        State("cytoscape", "style"),
+    ],
+)
+def generate_stylesheet(
+    node,
+    edge,
+    node_data,
+    edge_data,
+    attr_num,
+    highlight_style,
+    elements_master,
+    node_link,
+    degree_centrality,
+    stylesheet_state,
+    elements_state,
+    layout_state,
+    style_state,
+):
+
+    max_edge_intros_log = math.log(
+        summary_data[attr_list[attr_num]]["network"]["max_edge_intros"]
+    )
+    if node_data == None and edge_data == None:  # on startup
+        default_stylesheet = default_concentric_style(max_edge_intros_log)
+        style = {"width": "105%", "height": "900px", "backgroundColor": "#2e2e2c"}
+        layout = {"name": "concentric", "startAngle": 0, "fit": True}
+
+        return default_stylesheet, elements_master, layout, style
+
+    if (
+        (node_data == [] or node_data == None) and edge_data != [] and edge_data != None
+    ):  # Clicked Edge - graph propagated in other stylesheet
+        print("edge CLicked")
+        style = {"width": "105%", "height": "900px", "backgroundColor": "#2e2e2c"}
+        layout = {
+            "name": "concentric",
+            "startAngle": 0,
+            "fit": False,
+            "spacingFactor": 2,
+        }
+        return stylesheet_state, elements_state, layout, style
+
+    style = {"width": "105%", "height": "900px", "backgroundColor": "#2e2e2c"}
+    follower_color = "red"
+    following_color = "green"
+    node_shape = "circle"
+    max_edge_intros = summary_data[attr_list[attr_num]]["network"]["max_edge_intros"]
+    layout = {"name": "concentric", "startAngle": 0, "fit": False}
+
+    if highlight_style == "highlight":
+        default_stylesheet = default_concentric_style(max_edge_intros_log)
+        if node_data == []:
+            return default_stylesheet, elements_master, layout, style
+        if not node:
+            return default_stylesheet, elements_master, layout, style
+
+        stylesheet = concentric_highlight_node(
+            node,
+            math.log(summary_data[attr_list[attr_num]]["network"]["max_edge_intros"]),
+        )
+
+        # print(node["edgesData"])
+        # print(node["nodesData"])
+        return stylesheet, elements_master, layout, style
+
+    elif highlight_style == "focus":
+
+        default_stylesheet = default_concentric_style(max_edge_intros_log)
+
+        if node_data == []:
+            return default_stylesheet, elements_master, layout, style
+        if not node:
+            return default_stylesheet, elements_master, layout, style
+        layout = {
+            "name": "concentric",
+            "startAngle": 0,
+            "fit": False,
+            "spacingFactor": 2,
+            "animate": True,
+            "animationDuration": 500,
+        }
+        # "minNodeSpacing": 80
+        degree_centrality = summary_data[attr_list[attr_num]]["network"]["degree_cent"]
+        G = nx.node_link_graph(node_link)
+        focus_elements = concentric_focus_elements(
+            G, country_codes_dict, degree_centrality, node["edgesData"]
+        )  # NEED G< CCD< DEDREE CENT IN THIS FUNCTION
+        stylesheet = concentric_highlight_node(
+            node,
+            math.log(summary_data[attr_list[attr_num]]["network"]["max_edge_intros"]),
+        )
+        return stylesheet, focus_elements, layout, style
+
+
+@app.callback(
+    [
+        Output("network_summary_histogram_1", "children"),
+        Output("network_summary_histogram_2", "children"),
+    ],
+    [
+        Input("cytoscape", "tapNode"),
+        Input("cytoscape", "tapEdge"),
+        Input("cytoscape", "selectedNodeData"),
+        Input("cytoscape", "selectedEdgeData"),
+        Input("graph_storage", "data"),
+    ],
+)
+def summary_network_edge_histogram(node, edge, node_data, edge_data, node_link):
+    G = nx.node_link_graph(node_link)
+    if (node_data == [] or node_data == None) and edge_data != [] and edge_data != None:
+
+        source = edge_data[0]["source"]
+        target = edge_data[0]["target"]
+        years = G[source][target]["years"]
+        trace = go.Histogram(
+            x=years,
+            xbins=dict(start=min(years), size=1, end=max(years)),
+            marker=dict(color="blue"),
+        )
+        layout = go.Layout(title=str("Introductions From " + source + " to " + target))
+
+        fig = go.Figure(data=go.Data([trace]), layout=layout)
+        fig.update_layout(
+            xaxis=dict(tickmode="linear", dtick=1),
+            yaxis=dict(tickmode="linear", dtick=1),
+        )
+        return dcc.Graph(figure=fig), []
+
+    elif node_data != [] or node is None:
+
+        # Imports
+        target = node_data[0]["id"]
+        intro_data = G.nodes[target]["intro_years"]
+        export_data = G.nodes[target]["export_years"]
+        print(target)
+        print(intro_data)
+        print(export_data)
+        intro_trace = go.Histogram(
+            x=intro_data,
+            xbins=dict(start=min(intro_data), size=1, end=max(intro_data)),
+            marker=dict(color="red"),
+        )
+        intro_layout = go.Layout(title=str("All Introductions to " + target))
+
+        intro_fig = go.Figure(data=[intro_trace], layout=intro_layout)
+        intro_fig.update_layout(
+            xaxis=dict(tickmode="linear", dtick=1),
+            yaxis=dict(tickmode="linear", dtick=1),
+        )
+        if export_data == []:
+            return dcc.Graph(figure=intro_fig), []
+
+        export_trace = go.Histogram(
+            x=export_data,
+            xbins=dict(start=min(export_data), size=1, end=max(export_data)),
+            marker=dict(color="green"),
+        )
+        export_layout = go.Layout(title=str("All Exports from " + target))
+
+        export_fig = go.Figure(data=[export_trace], layout=export_layout)
+        export_fig.update_layout(
+            xaxis=dict(tickmode="linear", dtick=1),
+            yaxis=dict(tickmode="linear", dtick=1),
+        )
+
+        return dcc.Graph(figure=intro_fig), dcc.Graph(figure=export_fig)
+
+    else:
+        return [], []
+
+
+# callback here to take attr from dropdown and pass it to the degree centrality slider as the max centrality measure
+fi_multi_tab_content = html.Div(
     [
         html.Br(),
         html.Br(),
@@ -363,56 +787,115 @@ app.layout = html.Div(
             children=[
                 dcc.Tabs(
                     id="tabs",
-                    value="tab_4",
+                    value="geographic_tab",
                     className="custom-tabs",
                     children=[
                         dcc.Tab(
-                            id="tab-4",
+                            id="tab-1",
                             label="Geographic",
-                            value="tab_4",
+                            value="geographic_tab",
                             className="custom-tab",
                             selected_className="custom-tab--selected",
                             children=[html.Div(id="graph-4")],
                         ),
                         dcc.Tab(
-                            id="tab-1",
+                            id="tab-2",
                             label="Network",
-                            value="tab_1",
+                            value="network_tab",
                             className="custom-tab",
                             selected_className="custom-tab--selected",
                             children=[
                                 dcc.Tabs(
-                                    id="subtabs1",
-                                    value="individual",
+                                    id="network_tabs",
+                                    value="first_intros",
                                     className="custom-tabs",
                                     children=[
                                         dcc.Tab(
-                                            label="First Introductions: Individual Runs",
-                                            id="subtab1",
-                                            value="individual",
-                                            children=html.Div(id="graph-1"),
+                                            label="First Introductions",
+                                            id="fi_subtab",
+                                            value="first_intros",
                                             className="custom-tab",
                                             selected_className="custom-tab--selected",
+                                            children=[
+                                                dcc.Tabs(
+                                                    id="fi_network_tabs",
+                                                    value="fi_individual",
+                                                    className="custom-tabs",
+                                                    children=[
+                                                        dcc.Tab(
+                                                            label="First Introductions: Individual Runs",
+                                                            id="fi_subsubtab1",
+                                                            value="fi_individual",
+                                                            children=html.Div(
+                                                                id="fi_ind_network_graph"
+                                                            ),
+                                                            className="custom-tab",
+                                                            selected_className="custom-tab--selected",
+                                                        ),
+                                                        dcc.Tab(
+                                                            label="First Introductions: Multiple Runs",
+                                                            id="fi_subsubtab2",
+                                                            value="fi_multi",
+                                                            children=html.Div(
+                                                                id="fi_multi_network_graph"
+                                                            ),
+                                                            className="custom-tab",
+                                                            selected_className="custom-tab--selected",
+                                                        ),
+                                                    ],
+                                                )
+                                            ],
                                         ),
                                         dcc.Tab(
-                                            label="First Introductions: Multi",
-                                            id="subtab2",
-                                            value="multi",
-                                            children=html.Div(id="graph-3"),
+                                            id="ri_subtab",
+                                            label="All Introductions",
+                                            value="fi-multi",
+                                            children=[
+                                                html.Div(
+                                                    [
+                                                        html.Div(
+                                                            [
+                                                                cyto.Cytoscape(
+                                                                    id="cytoscape",
+                                                                    elements=[],
+                                                                    style={
+                                                                        "width": "100%",
+                                                                        "height": "900px",
+                                                                        "backgroundColor": "#2e2e2c",
+                                                                    },
+                                                                    layout={
+                                                                        "name": "preset"
+                                                                    },
+                                                                    stylesheet=[],
+                                                                )
+                                                            ],
+                                                            className="nine columns",
+                                                        ),
+                                                        html.Div(
+                                                            id="network_summary_histogram_1",
+                                                            className="three columns",
+                                                        ),
+                                                        html.Div(
+                                                            id="network_summary_histogram_2",
+                                                            className="three columns",
+                                                        ),
+                                                    ]
+                                                )
+                                            ],
                                             className="custom-tab",
                                             selected_className="custom-tab--selected",
                                         ),
                                     ],
-                                )
+                                ),
                             ],
                         ),
                         dcc.Tab(
-                            id="tab-2",
+                            id="tab-3",
                             label="Temporal",
-                            value="tab_2",
+                            value="temporal_tab",
                             className="custom-tab",
                             selected_className="custom-tab--selected",
-                            children=[html.Div(id="graph-2")],
+                            children=[html.Div(id="temporal_graph")],
                         ),
                     ],
                     colors={
@@ -424,7 +907,7 @@ app.layout = html.Div(
                 html.Div(id="tabs-content"),
             ],
         )
-    ]
+    ],
 )
 
 
@@ -432,21 +915,25 @@ app.layout = html.Div(
     Output("tabs-content", "children"),
     [
         dash.dependencies.Input("tabs", "value"),
-        dash.dependencies.Input("subtabs1", "value"),
+        dash.dependencies.Input("network_tabs", "value"),
+        dash.dependencies.Input("fi_network_tabs", "value"),
     ],
 )
-def render_content(tab, subtab):
-    if tab == "tab_1":
-        if subtab == "multi":
-            return tab3
+def render_content(tab, network_tab, fi_content):
+    if tab == "network_tab":
+        if network_tab == "first_intros":
+            if fi_content == "fi_individual":
+                return fi_ind_tab_content
+            elif fi_content == "fi_multi":
+                return fi_multi_tab_content
 
-        return tab1
-    elif tab == "tab_2":
-        return tab2
-    elif tab == "tab_3":
-        return tab3
-    elif tab == "tab_4":
-        return tab4
+        else:
+            return ri_network_tab_content
+    elif tab == "temporal_tab":
+        return temporal_tab_content
+
+    elif tab == "geographic_tab":
+        return geographic_tab_content
 
 
 @app.callback(
@@ -533,7 +1020,7 @@ def select_attr_map(attr_num):
 
 
 @app.callback(
-    Output("graph-2", "children"),
+    Output("temporal_graph", "children"),
     [
         Input("aggregate_view_select", "value"),
         Input("aggregate_attr_list", "value"),
@@ -610,10 +1097,7 @@ def update_graph_aggregate(view, attributes_selected, data_selected):
                     )
 
     if view == "avg" or view == "all":
-        print(attributes_selected)
         for attr in attributes_selected:
-            # print(i)
-            print(attr)
             dates = summary_data[attr]["aggregate"][data_selected]["dates"]
             data = summary_data[attr]["aggregate"][data_selected]["data"]
             if data_selected == "num_introductions":
@@ -646,7 +1130,7 @@ def update_graph_aggregate(view, attributes_selected, data_selected):
 
 @app.callback(  # currently all info fed into the same callback - may change in the future if faster layout speeds needed
     [
-        Output("graph-1", "children"),
+        Output("fi_ind_network_graph", "children"),
         Output("total_countries_o", "children"),
         Output("total_intros_o", "children"),
         Output("avg_reintros_o", "children"),
@@ -768,7 +1252,7 @@ def update_graph_individual(
 
 
 @app.callback(
-    Output("graph-3", "children"),
+    Output("fi_multi_network_graph", "children"),
     [
         Input("multi_tree_attr_list", "value"),
         Input("year_slider_multi", "value"),
@@ -886,7 +1370,7 @@ def multi_tree_graph(selected_attr_list, year_selection_slider, uspath):
     ],
     [Input(component_id="data_type_map", component_property="value")],
 )
-def show_hide_element(selected_data):
+def show_hide_element_map(selected_data):
     if selected_data == "ind":
         return [
             {"display": "block"},
@@ -1166,7 +1650,6 @@ def update_map(attr_num, year_selection_slider, iteration, view_options, data_ty
         reverse_colorscale = False
 
         for i in iso_column:
-            print(i)
             labels.append(
                 summary_data[attr_list[attr_num]]["cartographic"]["labels"][i]
             )

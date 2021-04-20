@@ -69,7 +69,7 @@ def addEdge(
             pointy = y0 + (y1 - y0) / 2
 
         # Find the directions the arrows are pointing
-        signx = (x1 - x0) / abs(x1 - (x0 + 0.0000001))
+        signx = (x1 - x0) / abs(x1 - (x0 + 0.000001))
         signy = (y1 - y0) / abs(y1 - y0 + 0.0000001)
 
         # Append first arrowhead
