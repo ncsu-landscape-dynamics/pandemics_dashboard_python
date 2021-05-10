@@ -23,7 +23,7 @@ def default_concentric_style(max_edge_intros_log, color_selected):
                 "text-valign": "center",
                 "text-halign": "center",
                 "color": "black",
-                "border-color": "#8ca37f",
+                "border-color": "#017520",
                 "border-width": "data(border_width)",
                 "background-color": node_color,
             },

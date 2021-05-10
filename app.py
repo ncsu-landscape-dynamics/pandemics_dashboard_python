@@ -464,9 +464,12 @@ def all_intros_network_graph(
     starting_countries = literal_eval(
         header[header.attributes.str.contains("starting_countries")].values[0, 2]
     )[attr_num]
+
     max_node_intros = summary_data[attr_list[attr_num]]["network"]["max_node_intros"]
 
-    graph_countries_list = starting_countries  # the list of selected countires to build a subgraph from. All starting countries are included
+    graph_countries_list = (
+        starting_countries.copy()
+    )  # the list of selected countires to build a subgraph from. All starting countries are included
     prop_dict = summary_data[attr_list[attr_num]]["network"]["prop_dict"]
     degree_centrality = summary_data[attr_list[attr_num]]["network"]["degree_cent"]
     for country in G.nodes():

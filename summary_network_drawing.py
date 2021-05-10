@@ -147,9 +147,9 @@ def generate_cytoscape_elements(G, country_codes_dict, degree_cent, starting_cou
         if source not in nodes:
             nodes.add(source)
             border_width = 0
-            print(starting_countries)
+            #print(starting_countries)
             if source in starting_countries:
-                print(source)
+                #print(source)
                 border_width = 4
 
             cy_nodes.append(
