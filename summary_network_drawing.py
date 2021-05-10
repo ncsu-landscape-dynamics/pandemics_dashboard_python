@@ -141,16 +141,17 @@ def generate_cytoscape_elements(G, country_codes_dict, degree_cent, starting_cou
 
     cy_edges = []
     cy_nodes = []
-    print(starting_countries)
     for network_edge in G.edges():
         source = network_edge[0]
         target = network_edge[1]
         if source not in nodes:
             nodes.add(source)
+            border_width = 0
+            print(starting_countries)
             if source in starting_countries:
+                print(source)
                 border_width = 4
-            else:
-                border_width = 0
+
             cy_nodes.append(
                 {
                     "data": {
@@ -159,6 +160,7 @@ def generate_cytoscape_elements(G, country_codes_dict, degree_cent, starting_cou
                         "total_intros": G.nodes[source]["total_intros"],
                         "shell": 1,
                         "border_width": border_width,
+                        "centrality_color": G.nodes[source]["centrality_color"],
                     }
                 }
             )
@@ -171,6 +173,8 @@ def generate_cytoscape_elements(G, country_codes_dict, degree_cent, starting_cou
                         "label": country_codes_dict[target],
                         "total_intros": G.nodes[target]["total_intros"],
                         "shell": 1,
+                        "border_width": 0,
+                        "centrality_color": G.nodes[target]["centrality_color"],
                     }
                 }
             )
@@ -190,10 +194,56 @@ def generate_cytoscape_elements(G, country_codes_dict, degree_cent, starting_cou
     return elements
 
 
-def concentric_focus_elements(G, country_codes_dict, degree_cent, edge_data):
+def concentric_focus_elements(
+    G, country_codes_dict, edge_data, expand_on, existing_elements
+):
     nodes = set()
     cy_edges = []
     cy_nodes = []
+    if existing_elements != []:
+        edges = list(G.in_edges(expand_on)) + list(G.out_edges(expand_on))
+        for edge in edges:
+            source = edge[0]
+            target = edge[1]
+            if source not in nodes:
+                nodes.add(source)
+                cy_nodes.append(
+                    {
+                        "data": {
+                            "id": source,
+                            "label": country_codes_dict[source],
+                            "total_intros": G.nodes[source]["total_intros"],
+                        }
+                    }
+                )
+            if target not in nodes:
+                nodes.add(target)
+                cy_nodes.append(
+                    {
+                        "data": {
+                            "id": target,
+                            "label": country_codes_dict[target],
+                            "total_intros": G.nodes[target]["total_intros"],
+                        }
+                    }
+                )
+
+            cy_edges.append(
+                {
+                    "data": {
+                        "id": source + "to" + target,
+                        "source": source,
+                        "target": target,
+                        "num_intros": G[source][target]["num_intros"],
+                        "log_intros": G[source][target]["log_intros"],
+                    }
+                }
+            )
+
+            # print(cy_edges)
+        elements = cy_edges + cy_nodes
+        return elements
+
     for edge in edge_data:
         source = edge["source"]
         target = edge["target"]
@@ -205,7 +255,6 @@ def concentric_focus_elements(G, country_codes_dict, degree_cent, edge_data):
                         "id": source,
                         "label": country_codes_dict[source],
                         "total_intros": G.nodes[source]["total_intros"],
-                        "shell": 1,
                     }
                 }
             )
@@ -217,7 +266,6 @@ def concentric_focus_elements(G, country_codes_dict, degree_cent, edge_data):
                         "id": target,
                         "label": country_codes_dict[target],
                         "total_intros": G.nodes[target]["total_intros"],
-                        "shell": 1,
                     }
                 }
             )
@@ -233,5 +281,7 @@ def concentric_focus_elements(G, country_codes_dict, degree_cent, edge_data):
                 }
             }
         )
+
     elements = cy_nodes + cy_edges
+
     return elements

@@ -1,9 +1,17 @@
-follower_color = "red"
-following_color = "green"
+destination_color = "#de5716"  # orange
+source_color = "#8338EC"  # Purple
+selected_color = "#FF006E"
 node_shape = "circle"
 
 
-def default_concentric_style(max_edge_intros_log):
+def default_concentric_style(max_edge_intros_log, color_selected):
+    if color_selected == "no_color":
+        node_color = "grey"
+    elif color_selected == "centrality":
+        node_color = "data(centrality_color)"
+    else:
+        node_color = "grey"
+
     return [
         {
             "selector": "node",
@@ -14,10 +22,10 @@ def default_concentric_style(max_edge_intros_log):
                 "font-size": "12px",
                 "text-valign": "center",
                 "text-halign": "center",
-                "color": "White",
+                "color": "black",
                 "border-color": "#8ca37f",
                 "border-width": "data(border_width)",
-                "background-color": "mapData(total_intros, 0, 500, red,  blue)",
+                "background-color": node_color,
             },
         },
         {
@@ -36,7 +44,7 @@ def default_concentric_style(max_edge_intros_log):
 
 
 def concentric_highlight_node(node, max_edge_intros_log):
-    stylesheet = [  # unselected, "greyed out"
+    stylesheet = [
         {"selector": "node", "style": {"opacity": 0.3, "shape": node_shape}},
         {
             "selector": "edge",
@@ -48,10 +56,7 @@ def concentric_highlight_node(node, max_edge_intros_log):
         {
             "selector": 'node[id = "{}"]'.format(node["data"]["id"]),
             "style": {
-                "background-color": "#B10DC9",
-                "border-color": "#8ca37f",
-                "border-width": "data(border_width)",
-                "border-opacity": 1,
+                "background-color": selected_color,
                 "opacity": 1,
                 "label": "data(label)",
                 "color": "#B10DC9",
@@ -59,7 +64,7 @@ def concentric_highlight_node(node, max_edge_intros_log):
                 "font-size": 12,
                 "text-valign": "center",
                 "text-halign": "center",
-                "color": "White",
+                "color": "black",
                 "z-index": 9999,
             },
         },
@@ -70,12 +75,12 @@ def concentric_highlight_node(node, max_edge_intros_log):
                 {
                     "selector": 'node[id = "{}"]'.format(edge["target"]),
                     "style": {
-                        "background-color": following_color,
+                        "background-color": source_color,
                         "opacity": 0.9,
                         "label": "data(label)",
                         "text-valign": "center",
                         "text-halign": "center",
-                        "color": "White",
+                        "color": "black",
                     },
                 }
             )
@@ -83,14 +88,14 @@ def concentric_highlight_node(node, max_edge_intros_log):
                 {
                     "selector": 'edge[id= "{}"]'.format(edge["id"]),
                     "style": {
-                        "mid-target-arrow-color": following_color,
+                        "mid-target-arrow-color": source_color,
                         "mid-target-arrow-shape": "triangle",
-                        "line-color": following_color,
-                        "opacity": 0.9,
+                        "line-color": source_color,
+                        "opacity": 0.5,
                         "z-index": 5000,
                         "text-valign": "center",
                         "text-halign": "center",
-                        "color": "White",
+                        "color": "black",
                         "width": "mapData(log_intros, 0, "
                         + str(max_edge_intros_log)
                         + ", 2, 24)",
@@ -104,13 +109,13 @@ def concentric_highlight_node(node, max_edge_intros_log):
                 {
                     "selector": 'node[id = "{}"]'.format(edge["source"]),
                     "style": {
-                        "background-color": follower_color,
+                        "background-color": destination_color,
                         "opacity": 0.9,
                         "z-index": 9999,
                         "label": "data(label)",
                         "text-valign": "center",
                         "text-halign": "center",
-                        "color": "White",
+                        "color": "black",
                     },
                 }
             )
@@ -118,9 +123,9 @@ def concentric_highlight_node(node, max_edge_intros_log):
                 {
                     "selector": 'edge[id= "{}"]'.format(edge["id"]),
                     "style": {
-                        "mid-target-arrow-color": follower_color,
+                        "mid-target-arrow-color": destination_color,
                         "mid-target-arrow-shape": "triangle",
-                        "line-color": follower_color,
+                        "line-color": destination_color,
                         "opacity": 1,
                         "z-index": 5000,
                         "width": "mapData(log_intros, 0, "
@@ -129,4 +134,120 @@ def concentric_highlight_node(node, max_edge_intros_log):
                     },
                 }
             )
+    return stylesheet
+
+
+def expand_focus_stylesheet(
+    new_elements, max_edge_intros_log, root_node, node, root_source_countries
+):
+    stylesheet = []
+    for element in new_elements:
+        if "target" in element["data"].keys():  # just gives edge elements
+            source = element["data"]["source"]
+            target = element["data"]["target"]
+
+            if (
+                target in root_source_countries
+                and target != root_node
+                and source != root_node
+            ):  # ORANGE COUNTRIES
+                stylesheet.append(
+                    {
+                        "selector": 'node[id = "{}"]'.format(target),
+                        "style": {
+                            "background-color": destination_color,
+                            "opacity": 0.9,
+                            "label": "data(label)",
+                            "text-valign": "center",
+                            "text-halign": "center",
+                            "color": "black",
+                        },
+                    }
+                )
+                stylesheet.append(
+                    {
+                        "selector": 'node[id = "{}"]'.format(source),
+                        "style": {
+                            "background-color": destination_color,
+                            "opacity": 0.9,
+                            "label": "data(label)",
+                            "text-valign": "center",
+                            "text-halign": "center",
+                            "color": "black",
+                        },
+                    }
+                )
+
+                stylesheet.append(
+                    {
+                        "selector": 'edge[id= "{}"]'.format(element["data"]["id"]),
+                        "style": {
+                            "mid-target-arrow-color": destination_color,
+                            "mid-target-arrow-shape": "triangle",
+                            "line-color": destination_color,
+                            "opacity": 0.5,
+                            "z-index": 5000,
+                            "text-valign": "center",
+                            "text-halign": "center",
+                            "color": "black",
+                            "width": "mapData(log_intros, 0, "
+                            + str(max_edge_intros_log)
+                            + ", 2, 24)",
+                            # "label": "data(num_intros)",
+                        },
+                    }
+                )
+
+            elif (
+                source != root_node
+                and target != root_node
+                and target not in root_source_countries
+            ):  # PURPLES
+                stylesheet.append(
+                    {
+                        "selector": 'node[id = "{}"]'.format(target),
+                        "style": {
+                            "background-color": source_color,
+                            "opacity": 0.9,
+                            "label": "data(label)",
+                            "text-valign": "center",
+                            "text-halign": "center",
+                            "color": "black",
+                        },
+                    }
+                )
+                if source not in root_source_countries:
+                    stylesheet.append(
+                        {
+                            "selector": 'node[id = "{}"]'.format(source),
+                            "style": {
+                                "background-color": source_color,
+                                "opacity": 0.9,
+                                "label": "data(label)",
+                                "text-valign": "center",
+                                "text-halign": "center",
+                                "color": "black",
+                            },
+                        }
+                    )
+                stylesheet.append(
+                    {
+                        "selector": 'edge[id= "{}"]'.format(element["data"]["id"]),
+                        "style": {
+                            "mid-target-arrow-color": source_color,
+                            "mid-target-arrow-shape": "triangle",
+                            "line-color": source_color,
+                            "opacity": 0.5,
+                            "z-index": 5000,
+                            "text-valign": "center",
+                            "text-halign": "center",
+                            "color": "black",
+                            "width": "mapData(log_intros, 0, "
+                            + str(max_edge_intros_log)
+                            + ", 2, 24)",
+                            # "label": "data(num_intros)",
+                        },
+                    }
+                )
+
     return stylesheet

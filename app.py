@@ -66,7 +66,7 @@ od_initialize, prob_initialize = get_pandemic_data_files(filepath, 0, 0, attr_li
 country_codes_dict = country_codes()
 
 viz_data_path = os.path.join(filepath, "summary_data")
-
+cyto.load_extra_layouts()  # cytoscape force directed layouts
 summary_data = pickle.load(open(os.path.join(viz_data_path, "summary_data.p"), "rb"))
 app = dash.Dash(__name__, assets_folder="assets", suppress_callback_exceptions=True)
 
@@ -77,7 +77,7 @@ fi_ind_tab_content = html.Div(
     [
         html.Div(
             [
-                dcc.Markdown("""***Attribute Set***"""),
+                dcc.Markdown("""***Scenario:***"""),
                 dcc.Dropdown(
                     id="attr_dropdown",
                     persistence=True,
@@ -245,7 +245,7 @@ geographic_tab_content = html.Div(
                     options=[
                         {"label": "Year of First Introduction", "value": "first"},
                         {"label": "Reintroductions", "value": "reintro"},
-                        {"label": "Individual Runs", "value": "ind"},
+                        # {"label": "Individual Runs", "value": "ind"},
                     ],
                     value="first",
                     labelStyle={
@@ -257,7 +257,7 @@ geographic_tab_content = html.Div(
                     className="radiobutton-group",
                     labelStyle={"display": "inline-block"},
                 ),
-                dcc.Markdown("""***Attribute Set***"""),
+                dcc.Markdown("""***Scenario:***"""),
                 dcc.Dropdown(
                     id="attr_dropdown_map",
                     options=[
@@ -320,6 +320,8 @@ ri_network_tab_content = html.Div(
                 dcc.Store(id="elements_storage"),
                 dcc.Store(id="graph_storage"),
                 dcc.Store(id="degree_cent_storage"),
+                dcc.Store(id="graph_is_focused_storage"),
+                dcc.Markdown("""***Scenario:***"""),
                 dcc.Dropdown(
                     id="ri_network_attr_dropdown",
                     options=[
@@ -337,28 +339,35 @@ ri_network_tab_content = html.Div(
         ),
         html.Div(
             [
-                dcc.Markdown("""***Highlight Style:***"""),
+                dcc.Markdown("""***Display Style:***"""),
                 dcc.RadioItems(
                     id="ri_network_highlight_style",
                     className="radiobutton-group",
                     options=[
-                        {"label": "Highlight ", "value": "highlight"},
-                        {"label": "focus", "value": "focus"},
+                        {
+                            "label": "Focus - Click to Expand Connected Nodes",
+                            "value": "focus_expand",
+                        },
+                        {
+                            "label": "Highlight - Show Country in Context ",
+                            "value": "highlight",
+                        },
                     ],
-                    value="highlight",
+                    value="focus_expand",
                     labelStyle={
                         "display": "inline-block",
                     },
                 ),
-                dcc.Markdown("""***Layout Style:***"""),
+                html.Hr(),
+                dcc.Markdown("""***Node Color:***"""),
                 dcc.RadioItems(
-                    id="ri_network_layout_select",
+                    id="ri_network_node_color",
                     className="radiobutton-group",
                     options=[
-                        {"label": "Force-Directed ", "value": "force"},
-                        {"label": "Shell", "value": "shell"},
+                        {"label": "None ", "value": "no_color"},
+                        {"label": "Centrality", "value": "centrality"},
                     ],
-                    value="force",
+                    value="centrality",
                     labelStyle={
                         "display": "inline-block",
                     },
@@ -370,7 +379,15 @@ ri_network_tab_content = html.Div(
         html.Div(
             [
                 dcc.Markdown("""***Filter Edges***"""),
-                dcc.Slider(id="ri_edge_weight_slider", min=0, value=0),
+                html.Div(id="edge_slider_value_container", style={"margin-top": 20}),
+                dcc.Slider(
+                    id="ri_edge_weight_slider",
+                    min=0,
+                    max=3,
+                    step=0.01,
+                    updatemode="drag",
+                    value=0,
+                ),
                 dcc.Markdown("""***Filter Nodes ***"""),
                 dcc.Markdown("""Proportion of Runs (uncertainty) > :"""),
                 dcc.Slider(
@@ -386,47 +403,27 @@ ri_network_tab_content = html.Div(
             ],
             style={"padding": "0px 20px 20px 20px"},
         ),
-        html.Div(
-            [
-                html.Hr(),
-                dcc.Markdown(
-                    """Force-directed optimal spacing (k) - used to "compress" graph :"""
-                ),
-                dcc.Input(
-                    id="ri_k_value",
-                    type="number",
-                    min=0,
-                    max=1000,
-                    debounce=True,
-                    placeholder="Try values 1-100 to start",
-                    value=None,
-                ),
-            ],
-            style={"padding": "0px 20px 20px 20px"},
-        ),
     ]
 )
 
 
 @app.callback(
+    Output("edge_slider_value_container", "children"),
+    Input("ri_edge_weight_slider", "value"),
+)
+def edge_slider_weight(value):
+    transformed = 10 ** value
+    return "Edges > :  {:0.0f}".format(transformed)
+
+
+@app.callback(
     [
-        Output("ri_edge_weight_slider", "max"),
-        Output("ri_edge_weight_slider", "marks"),
         Output("ri_degree_centrality_slider", "max"),
         Output("ri_degree_centrality_slider", "marks"),
     ],
     Input("ri_network_attr_dropdown", "value"),
 )
 def populate_centraility_max(attr_num):
-    edge_weight = summary_data[attr_list[attr_num]]["network"]["max_edge_intros"]
-    edge_marks = dict(
-        [(i * 500, str(i * 500)) for i in range(2, int(edge_weight / 500))]
-    )
-    edge_marks[5] = "5"
-    edge_marks[10] = "10"
-    edge_marks[25] = "25"
-    edge_marks[50] = "50"
-    edge_marks[100] = "100"
 
     max_degree = summary_data[attr_list[attr_num]]["network"]["max_degree_cent"]
 
@@ -434,7 +431,7 @@ def populate_centraility_max(attr_num):
         [(i / 20, str(i / 20)) for i in range(0, int(max_degree * 20.0))]
     )
 
-    return edge_weight, edge_marks, max_degree, degree_marks
+    return max_degree, degree_marks
 
 
 """
@@ -455,15 +452,13 @@ def populate_centraility_max(attr_num):
     ],
     [
         dash.dependencies.Input("ri_network_attr_dropdown", "value"),
-        dash.dependencies.Input("ri_network_layout_select", "value"),
         dash.dependencies.Input("ri_network_prop_slider", "value"),
         dash.dependencies.Input("ri_degree_centrality_slider", "value"),
-        dash.dependencies.Input("ri_k_value", "value"),
         dash.dependencies.Input("ri_edge_weight_slider", "value"),
     ],
 )
 def all_intros_network_graph(
-    attr_num, layout, prop_slider, deg_centrality_slider, k_slider, edge_weight_slider
+    attr_num, prop_slider, deg_centrality_slider, edge_weight_slider
 ):
     G = summary_data[attr_list[attr_num]]["network"]["diGraph"]
     starting_countries = literal_eval(
@@ -484,7 +479,7 @@ def all_intros_network_graph(
     G = G.subgraph(graph_countries_list)
     graph_edges_list = []
     for edge in G.edges():
-        if G[edge[0]][edge[1]]["num_intros"] > edge_weight_slider:
+        if G[edge[0]][edge[1]]["num_intros"] > edge_weight_slider ** 10:
             graph_edges_list.append(edge)
 
     G = nx.edge_subgraph(G, graph_edges_list)
@@ -540,6 +535,7 @@ def all_intros_network_graph(
         Output("cytoscape", "elements"),
         Output("cytoscape", "layout"),
         Output("cytoscape", "style"),
+        Output("graph_is_focused_storage", "data"),
     ],
     [
         Input("cytoscape", "tapNode"),
@@ -551,12 +547,15 @@ def all_intros_network_graph(
         Input("elements_storage", "data"),
         Input("graph_storage", "data"),
         Input("degree_cent_storage", "data"),
+        dash.dependencies.Input("ri_network_node_color", "value"),
     ],
     [
         State("cytoscape", "stylesheet"),
         State("cytoscape", "elements"),
         State("cytoscape", "layout"),
         State("cytoscape", "style"),
+        State("cytoscape", "tapNode"),
+        State("graph_is_focused_storage", "data"),
     ],
 )
 def generate_stylesheet(
@@ -569,85 +568,156 @@ def generate_stylesheet(
     elements_master,
     node_link,
     degree_centrality,
+    color_selected,
     stylesheet_state,
     elements_state,
     layout_state,
     style_state,
+    node_state,
+    graph_is_focused,
 ):
 
     max_edge_intros_log = math.log(
         summary_data[attr_list[attr_num]]["network"]["max_edge_intros"]
     )
+
     if node_data == None and edge_data == None:  # on startup
-        default_stylesheet = default_concentric_style(max_edge_intros_log)
-        style = {"width": "105%", "height": "900px", "backgroundColor": "#2e2e2c"}
+        default_stylesheet = default_concentric_style(
+            max_edge_intros_log, color_selected
+        )
+        style = {
+            "width": "105%",
+            "height": "900px",
+            "backgroundColor": "#2e2e2c",
+            "minZoom": 0.2,
+            "maxZoom": 1,
+        }
         layout = {"name": "concentric", "startAngle": 0, "fit": True}
 
-        return default_stylesheet, elements_master, layout, style
+        return default_stylesheet, elements_master, layout, style, "unfocused"
 
     if (
         (node_data == [] or node_data == None) and edge_data != [] and edge_data != None
     ):  # Clicked Edge - graph propagated in other stylesheet
-        print("edge CLicked")
-        style = {"width": "105%", "height": "900px", "backgroundColor": "#2e2e2c"}
-        layout = {
-            "name": "concentric",
-            "startAngle": 0,
-            "fit": False,
-            "spacingFactor": 2,
-        }
-        return stylesheet_state, elements_state, layout, style
 
-    style = {"width": "105%", "height": "900px", "backgroundColor": "#2e2e2c"}
-    follower_color = "red"
-    following_color = "green"
-    node_shape = "circle"
+        return stylesheet_state, elements_state, layout_state, style_state, "unfocused"
+
+    style = {
+        "width": "105%",
+        "height": "800px",
+        "backgroundColor": "#2e2e2c",
+        "minZoom": 0.2,
+        "maxZoom": 1,
+    }
+
     max_edge_intros = summary_data[attr_list[attr_num]]["network"]["max_edge_intros"]
-    layout = {"name": "concentric", "startAngle": 0, "fit": False}
+    layout = {"name": "concentric", "startAngle": 0, "fit": True}
 
     if highlight_style == "highlight":
-        default_stylesheet = default_concentric_style(max_edge_intros_log)
+        default_stylesheet = default_concentric_style(
+            max_edge_intros_log, color_selected
+        )
         if node_data == []:
-            return default_stylesheet, elements_master, layout, style
+            return default_stylesheet, elements_master, layout, style, "unfocused"
         if not node:
-            return default_stylesheet, elements_master, layout, style
+            return default_stylesheet, elements_master, layout, styl, "unfocused"
 
         stylesheet = concentric_highlight_node(
             node,
-            math.log(summary_data[attr_list[attr_num]]["network"]["max_edge_intros"]),
+            math.log(max_edge_intros),
         )
 
-        # print(node["edgesData"])
-        # print(node["nodesData"])
-        return stylesheet, elements_master, layout, style
+        return stylesheet, elements_master, layout, style, "unfocused"
 
-    elif highlight_style == "focus":
+    elif highlight_style == "focus" or highlight_style == "focus_expand":
 
-        default_stylesheet = default_concentric_style(max_edge_intros_log)
+        default_stylesheet = default_concentric_style(
+            max_edge_intros_log, color_selected
+        )
 
-        if node_data == []:
-            return default_stylesheet, elements_master, layout, style
+        if node_data == [] or node_data == None:
+            return default_stylesheet, elements_master, layout, style, "unfocused"
         if not node:
-            return default_stylesheet, elements_master, layout, style
+            return default_stylesheet, elements_master, layout, style, "unfocused"
+
+        if graph_is_focused != "unfocused" and highlight_style == "focus_expand":
+
+            degree_centrality = summary_data[attr_list[attr_num]]["network"][
+                "degree_cent"
+            ]
+            G = nx.node_link_graph(node_link)
+
+            # print("ELEMENTS STATE", elements_state)
+            # print(node.keys())
+            root_source_countries = list(G.predecessors(graph_is_focused))
+            new_elements = concentric_focus_elements(
+                G,
+                country_codes_dict,
+                node["edgesData"],
+                expand_on=node_data[0]["id"],
+                existing_elements=elements_state,
+            )  # NEED G< CCD< DEDREE CENT IN THIS FUNCTION
+            focus_elements = new_elements + elements_state
+
+            stylesheet = concentric_highlight_node(
+                node,
+                math.log(
+                    summary_data[attr_list[attr_num]]["network"]["max_edge_intros"]
+                ),
+            )
+            # print("FOCUS_ELEMENTS", focus_elements)
+            new_stylesheet = expand_focus_stylesheet(
+                new_elements,
+                math.log(
+                    summary_data[attr_list[attr_num]]["network"]["max_edge_intros"]
+                ),
+                graph_is_focused,
+                node,
+                root_source_countries=root_source_countries,
+            )
+
+            stylesheet = stylesheet_state + new_stylesheet
+            return stylesheet, focus_elements, layout_state, style, graph_is_focused
+
+        layout = {
+            "name": "cola",
+            "animate": False,
+            "animationDuration": 200,
+            "fit": False,
+            "minZoom": 0.2,
+            "maxZoom": 1,
+        }
+        """
         layout = {
             "name": "concentric",
             "startAngle": 0,
             "fit": False,
             "spacingFactor": 2,
             "animate": True,
-            "animationDuration": 500,
+            "animationDuration": 300,
+            
         }
+
+
+        """
         # "minNodeSpacing": 80
-        degree_centrality = summary_data[attr_list[attr_num]]["network"]["degree_cent"]
         G = nx.node_link_graph(node_link)
         focus_elements = concentric_focus_elements(
-            G, country_codes_dict, degree_centrality, node["edgesData"]
+            G,
+            country_codes_dict,
+            node["edgesData"],
+            expand_on=None,
+            existing_elements=[],
         )  # NEED G< CCD< DEDREE CENT IN THIS FUNCTION
         stylesheet = concentric_highlight_node(
             node,
             math.log(summary_data[attr_list[attr_num]]["network"]["max_edge_intros"]),
         )
-        return stylesheet, focus_elements, layout, style
+        focused_node = node_data[0]["id"]
+        return stylesheet, focus_elements, layout, style, focused_node
+
+    # else:
+    # return default_stylesheet, elements_master, layout, style, "unfocused"
 
 
 @app.callback(
@@ -665,6 +735,9 @@ def generate_stylesheet(
 )
 def summary_network_edge_histogram(node, edge, node_data, edge_data, node_link):
     G = nx.node_link_graph(node_link)
+
+    if node_data is None and edge_data is None:
+        return [], []
     if (node_data == [] or node_data == None) and edge_data != [] and edge_data != None:
 
         source = edge_data[0]["source"]
@@ -673,52 +746,61 @@ def summary_network_edge_histogram(node, edge, node_data, edge_data, node_link):
         trace = go.Histogram(
             x=years,
             xbins=dict(start=min(years), size=1, end=max(years)),
-            marker=dict(color="blue"),
+            marker=dict(color="#8fc6cc"),
         )
         layout = go.Layout(title=str("Introductions From " + source + " to " + target))
 
-        fig = go.Figure(data=go.Data([trace]), layout=layout)
+        fig = go.Figure(data=trace, layout=layout)
         fig.update_layout(
-            xaxis=dict(tickmode="linear", dtick=1),
-            yaxis=dict(tickmode="linear", dtick=1),
+            xaxis=dict(tickmode="linear", dtick=1, color="white"),
+            yaxis=dict(tickmode="auto", color="white"),
+            height=450,
+            paper_bgcolor="#2e2e2c",
+            plot_bgcolor="#2e2e2c",
+            title_font=dict(color="white"),
         )
         return dcc.Graph(figure=fig), []
 
     elif node_data != [] or node is None:
 
         # Imports
-        target = node_data[0]["id"]
+        try:
+            target = node_data[0]["id"]
+        except IndexError:
+            return [], []
         intro_data = G.nodes[target]["intro_years"]
         export_data = G.nodes[target]["export_years"]
-        print(target)
-        print(intro_data)
-        print(export_data)
         intro_trace = go.Histogram(
             x=intro_data,
             xbins=dict(start=min(intro_data), size=1, end=max(intro_data)),
-            marker=dict(color="red"),
+            marker=dict(color="#de5716"),
         )
         intro_layout = go.Layout(title=str("All Introductions to " + target))
 
-        intro_fig = go.Figure(data=[intro_trace], layout=intro_layout)
+        intro_fig = go.Figure(data=intro_trace, layout=intro_layout)
         intro_fig.update_layout(
-            xaxis=dict(tickmode="linear", dtick=1),
-            yaxis=dict(tickmode="linear", dtick=1),
+            xaxis=dict(tickmode="linear", dtick=1, color="white"),
+            yaxis=dict(tickmode="auto", color="white"),
+            paper_bgcolor="#2e2e2c",
+            plot_bgcolor="#2e2e2c",
+            title_font=dict(color="white"),
         )
         if export_data == []:
             return dcc.Graph(figure=intro_fig), []
-
         export_trace = go.Histogram(
             x=export_data,
             xbins=dict(start=min(export_data), size=1, end=max(export_data)),
-            marker=dict(color="green"),
+            marker=dict(color="#8338EC"),
         )
         export_layout = go.Layout(title=str("All Exports from " + target))
 
         export_fig = go.Figure(data=[export_trace], layout=export_layout)
         export_fig.update_layout(
-            xaxis=dict(tickmode="linear", dtick=1),
-            yaxis=dict(tickmode="linear", dtick=1),
+            xaxis=dict(tickmode="linear", dtick=1, color="white"),
+            yaxis=dict(tickmode="auto", color="white"),
+            paper_bgcolor="#2e2e2c",
+            plot_bgcolor="#2e2e2c",
+            title_font=dict(color="white"),
         )
 
         return dcc.Graph(figure=intro_fig), dcc.Graph(figure=export_fig)
@@ -807,7 +889,7 @@ app.layout = html.Div(
                             children=[
                                 dcc.Tabs(
                                     id="network_tabs",
-                                    value="first_intros",
+                                    value="fi-multi",
                                     className="custom-tabs",
                                     children=[
                                         dcc.Tab(
@@ -857,10 +939,12 @@ app.layout = html.Div(
                                                             [
                                                                 cyto.Cytoscape(
                                                                     id="cytoscape",
+                                                                    minZoom=0.5,
+                                                                    maxZoom=2,
                                                                     elements=[],
                                                                     style={
                                                                         "width": "100%",
-                                                                        "height": "900px",
+                                                                        "height": "920px",
                                                                         "backgroundColor": "#2e2e2c",
                                                                     },
                                                                     layout={
@@ -1435,10 +1519,20 @@ def update_map(attr_num, year_selection_slider, iteration, view_options, data_ty
     starting_countries = literal_eval(
         header[header.attributes.str.contains("starting_countries")].values[0, 2]
     )[attr_num]
+    starting_countries_iso = []
+    starting_countries_labels = []
+    for country in starting_countries:
+        starting_countries_iso.append(country_codes_dict[country])
+        starting_countries_labels.append(
+            summary_data[attr_list[attr_num]]["cartographic"]["labels"][
+                country_codes_dict[country]
+            ]
+        )
     if data_type == "first":
         if (
             view_options == "fi_prop" or view_options == "fi_prop50"
         ):  # for proportion of runs w/introduction
+
             iso_column = summary_data[attr_list[attr_num]]["cartographic"]["data"][
                 view_options
             ]["ISO"]
@@ -1466,9 +1560,12 @@ def update_map(attr_num, year_selection_slider, iteration, view_options, data_ty
             reverse_colorscale = False
             labels = []
             for i in iso_column:
-                labels.append(
-                    summary_data[attr_list[attr_num]]["cartographic"]["labels"][i]
-                )
+                try:
+                    labels.append(
+                        summary_data[attr_list[attr_num]]["cartographic"]["labels"][i]
+                    )
+                except KeyError:
+                    labels.append("KeyError")
 
             fig = draw_vector_map(
                 title_text,
@@ -1477,6 +1574,8 @@ def update_map(attr_num, year_selection_slider, iteration, view_options, data_ty
                 colorscale,
                 reverse_colorscale,
                 labels,
+                starting_countries_iso,
+                starting_countries_labels,
             )
 
             return dcc.Graph(figure=fig)
@@ -1565,21 +1664,31 @@ def update_map(attr_num, year_selection_slider, iteration, view_options, data_ty
                 data_column = summary_data[attr_list[attr_num]]["cartographic"]["data"][
                     view_options
                 ]["data"]
-            labels = []
-            for i in iso_column:
-                labels.append(
-                    summary_data[attr_list[attr_num]]["cartographic"]["labels"][i]
-                )
+                labels = []
+                # print("ISO:")
+                # print(iso_column)
+                print(summary_data[attr_list[attr_num]]["cartographic"]["labels"])
+                for i in iso_column:
+                    try:
+                        labels.append(
+                            summary_data[attr_list[attr_num]]["cartographic"]["labels"][
+                                i
+                            ]
+                        )
+                    except KeyError:
+                        labels.append("KeyError")
 
-            fig = draw_vector_map(
-                title_text,
-                iso_column,
-                data_column,
-                colorscale,
-                reverse_colors,
-                labels,
-            )
-            return dcc.Graph(figure=fig)
+                fig = draw_vector_map(
+                    title_text,
+                    iso_column,
+                    data_column,
+                    colorscale,
+                    reverse_colors,
+                    labels,
+                    starting_countries_iso,
+                    starting_countries_labels,
+                )
+                return dcc.Graph(figure=fig)
 
     if data_type == "reintro":
 
@@ -1619,7 +1728,14 @@ def update_map(attr_num, year_selection_slider, iteration, view_options, data_ty
                 summary_data[attr_list[attr_num]]["cartographic"]["labels"][i]
             )
         fig = draw_vector_map(
-            title_text, iso_column, data_column, colorscale, reverse_colors, labels
+            title_text,
+            iso_column,
+            data_column,
+            colorscale,
+            reverse_colors,
+            labels,
+            starting_countries_iso,
+            starting_countries_labels,
         )
         return dcc.Graph(figure=fig)
     if data_type == "ind":
@@ -1655,7 +1771,14 @@ def update_map(attr_num, year_selection_slider, iteration, view_options, data_ty
             )
 
         fig = draw_vector_map(
-            title_text, iso_column, data_column, colorscale, reverse_colorscale, labels
+            title_text,
+            iso_column,
+            data_column,
+            colorscale,
+            reverse_colorscale,
+            labels,
+            starting_countries_iso,
+            starting_countries_labels,
         )
         return dcc.Graph(figure=fig)
 
